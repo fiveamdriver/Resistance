@@ -1,0 +1,178 @@
+// =============================================================================
+// Resistance — Phase 1 data model
+// =============================================================================
+// Local dev uses SQLite for zero-config setup. The schema is intentionally
+// PostgreSQL-compatible: no enums (status/type fields are validated strings via
+// src/lib/fileTypes.ts), no SQLite-only types. To move to Postgres, change the
+// datasource provider to "postgresql" and update DATABASE_URL.
+//
+// Relationship overview (Phase 1):
+//   User      1──*  Project
+//   Project   1──*  ProjectFile
+//   Project   1──*  Component
+//   Project   1──*  Net
+//   Project   1──*  BomItem
+//   Project   1──*  DocumentChunk
+//   Component 1──*  Pin
+//   Pin       1──1  Connection   (a pin connects to exactly one net)
+//   Net       1──*  Connection   (a net has many connections / pins)
+//   BomItem   *──*  Component    (a BOM row can reference one or more components)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects Project[]
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Optional owner. Nullable in Phase 1 because we don't have auth yet.
+  ownerId String?
+  owner   User?   @relation(fields: [ownerId], references: [id])
+
+  files          ProjectFile[]
+  components      Component[]
+  nets           Net[]
+  bomItems       BomItem[]
+  documentChunks DocumentChunk[]
+
+  @@index([ownerId])
+}
+
+/// A file uploaded to a project (netlist, BOM, PDF, doc, etc.).
+model ProjectFile {
+  id           String   @id @default(cuid())
+  projectId    String
+  originalName String // filename as uploaded by the user
+  storedName   String // unique name on disk (collision-safe)
+  path         String // path on disk relative to the uploads dir
+  fileType     String // mime-ish / extension category — see lib/fileTypes.ts
+  category     String // "netlist" | "bom" | "pdf" | "document" | "other"
+  sizeBytes    Int      @default(0)
+  // Parse lifecycle: "pending" | "parsed" | "failed"
+  parseStatus  String   @default("pending")
+  parseError   String?
+  uploadedAt   DateTime @default(now())
+
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentChunks DocumentChunk[]
+
+  @@index([projectId])
+}
+
+/// An electrical component (IC, resistor, connector, ...). RefDes e.g. "U7".
+model Component {
+  id          String  @id @default(cuid())
+  projectId   String
+  refDes      String // reference designator, e.g. "U7", "R12", "J1"
+  name        String? // device / part name
+  description String?
+  value       String? // e.g. "10k", "100nF"
+  footprint   String?
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pins     Pin[]
+  bomItems BomItem[] // many-to-many: a component may appear on BOM rows
+
+  @@unique([projectId, refDes])
+  @@index([projectId])
+}
+
+/// An electrical net (signal). Name e.g. "5V", "GND", "SPI_CLK".
+model Net {
+  id        String @id @default(cuid())
+  projectId String
+  name      String
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connections Connection[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+}
+
+/// A pin on a component, e.g. U7 pin 14. Connects to at most one net.
+model Pin {
+  id          String  @id @default(cuid())
+  componentId String
+  number      String // pin number/designator, e.g. "14", "A1"
+  name        String? // pin function name, e.g. "VCC", "GPIO3"
+
+  component Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+
+  // One pin connects to exactly one net via a single Connection (enforced by
+  // the unique pinId on Connection below).
+  connection Connection?
+
+  @@unique([componentId, number])
+  @@index([componentId])
+}
+
+/// An edge in the connectivity graph: a single pin joined to a single net.
+/// A net has many connections (one per pin on the net).
+model Connection {
+  id    String @id @default(cuid())
+  netId String
+  pinId String @unique // a pin appears in at most one connection
+
+  net Net @relation(fields: [netId], references: [id], onDelete: Cascade)
+  pin Pin @relation(fields: [pinId], references: [id], onDelete: Cascade)
+
+  @@index([netId])
+}
+
+/// A row from a Bill of Materials. May map to one or more components.
+model BomItem {
+  id           String  @id @default(cuid())
+  projectId    String
+  refDesRaw    String? // raw refdes cell from the BOM, e.g. "R1, R2, R3"
+  description  String?
+  manufacturer String?
+  mpn          String? // manufacturer part number
+  value        String?
+  footprint    String?
+  quantity     Int     @default(1)
+
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  components Component[] // many-to-many
+
+  @@index([projectId])
+}
+
+/// A chunk of a document, ready for future RAG embedding/retrieval.
+model DocumentChunk {
+  id         String  @id @default(cuid())
+  projectId  String
+  fileId     String?
+  chunkIndex Int     @default(0)
+  content    String
+  // Embedding stored as JSON string for Phase 1 portability. In Postgres this
+  // becomes a pgvector column later.
+  embedding  String?
+  metadata   String? // JSON string for arbitrary chunk metadata
+
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  file    ProjectFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([fileId])
+}
