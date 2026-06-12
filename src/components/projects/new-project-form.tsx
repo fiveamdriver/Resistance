@@ -38,7 +38,10 @@ export function NewProjectForm() {
       )}
 
       <div className="space-y-1.5">
-        <label htmlFor="name" className="block text-sm font-medium text-slate-700">
+        <label
+          htmlFor="name"
+          className="block text-sm font-medium text-slate-700"
+        >
           Project name
         </label>
         <input

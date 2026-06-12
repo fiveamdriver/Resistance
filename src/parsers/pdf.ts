@@ -28,13 +28,11 @@ export async function parsePdf(_filePath: string): Promise<ParsedPdf> {
   const pages = [
     {
       pageNumber: 1,
-      text:
-        "TPS54331 — 3.5V to 28V Input, 3A Step-Down Converter. Absolute maximum ratings...",
+      text: "TPS54331 — 3.5V to 28V Input, 3A Step-Down Converter. Absolute maximum ratings...",
     },
     {
       pageNumber: 2,
-      text:
-        "Electrical Characteristics. Switching frequency 570 kHz typical. Enable threshold...",
+      text: "Electrical Characteristics. Switching frequency 570 kHz typical. Enable threshold...",
     },
   ];
 

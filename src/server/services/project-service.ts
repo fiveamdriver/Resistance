@@ -43,7 +43,10 @@ export async function getProjectDashboard(projectId: string) {
         orderBy: { name: "asc" },
         include: { _count: { select: { connections: true } } },
       },
-      bomItems: { orderBy: { refDesRaw: "asc" }, include: { components: true } },
+      bomItems: {
+        orderBy: { refDesRaw: "asc" },
+        include: { components: true },
+      },
       _count: { select: { documentChunks: true } },
     },
   });

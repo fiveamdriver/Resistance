@@ -89,7 +89,8 @@ export function buildGraph(connections: PinConnection[]): ConnectivityGraph {
       refDes: c.componentRefDes,
       pinNumbers: [],
     };
-    if (!comp.pinNumbers.includes(c.pinNumber)) comp.pinNumbers.push(c.pinNumber);
+    if (!comp.pinNumbers.includes(c.pinNumber))
+      comp.pinNumbers.push(c.pinNumber);
     componentMap.set(c.componentRefDes, comp);
 
     const net = netMap.get(c.netName) ?? {

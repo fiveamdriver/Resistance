@@ -17,12 +17,14 @@ export const createProjectSchema = z.object({
     .trim()
     .min(1, "Project name is required")
     .max(120, "Project name must be 120 characters or fewer"),
+  // Trim, then normalize a blank/whitespace-only field to undefined so an empty
+  // form input is stored as null rather than an empty string.
   description: z
     .string()
     .trim()
     .max(2000, "Description must be 2000 characters or fewer")
     .optional()
-    .or(z.literal("").transform(() => undefined)),
+    .transform((value) => (value === "" ? undefined : value)),
 });
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;

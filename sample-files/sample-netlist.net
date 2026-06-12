@@ -1,0 +1,26 @@
+[
+U7
+SOIC-8
+TPS54331 3A Step-Down Regulator
+]
+[
+R12
+0402
+Resistor 10k 1%
+]
+[
+C5
+0402
+Capacitor 100nF 16V X7R
+]
+(
+5V
+U7-1
+R12-1
+C5-1
+)
+(
+GND
+U7-4
+C5-2
+)

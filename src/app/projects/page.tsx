@@ -1,14 +1,11 @@
 import Link from "next/link";
 
-import { prisma } from "@/lib/prisma";
+import { listProjects } from "@/server/services/project-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage() {
-  const projects = await prisma.project.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { _count: { select: { files: true, components: true } } },
-  });
+  const projects = await listProjects();
 
   return (
     <div className="space-y-6">

@@ -18,12 +18,12 @@ export type AppErrorCode =
 export class AppError extends Error {
   readonly code: AppErrorCode;
   /** Optional field-level detail (e.g. Zod issues) safe to show the user. */
-  readonly details?: Record<string, string[]>;
+  readonly details?: Record<string, string[] | undefined>;
 
   constructor(
     code: AppErrorCode,
     message: string,
-    details?: Record<string, string[]>
+    details?: Record<string, string[] | undefined>
   ) {
     super(message);
     this.name = "AppError";
@@ -33,7 +33,7 @@ export class AppError extends Error {
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string, details?: Record<string, string[]>) {
+  constructor(message: string, details?: Record<string, string[] | undefined>) {
     super("VALIDATION_ERROR", message, details);
     this.name = "ValidationError";
   }
@@ -53,7 +53,7 @@ export class NotFoundError extends AppError {
 export function toUserError(error: unknown): {
   code: AppErrorCode | "INTERNAL_ERROR";
   message: string;
-  details?: Record<string, string[]>;
+  details?: Record<string, string[] | undefined>;
 } {
   if (error instanceof AppError) {
     return { code: error.code, message: error.message, details: error.details };

@@ -41,8 +41,8 @@ export default function HomePage() {
         <p className="max-w-2xl text-lg text-slate-600">
           Resistance turns your Altium project exports — netlists, BOMs,
           schematic PDFs, datasheets, and requirements — into a searchable
-          knowledge base, a connectivity graph, and an AI assistant for
-          hardware engineers.
+          knowledge base, a connectivity graph, and an AI assistant for hardware
+          engineers.
         </p>
         <div className="flex gap-3 pt-2">
           <Link

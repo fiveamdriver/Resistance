@@ -8,7 +8,7 @@ import { createProject as createProjectService } from "@/server/services/project
 
 export interface CreateProjectState {
   error?: string;
-  fieldErrors?: Record<string, string[]>;
+  fieldErrors?: Record<string, string[] | undefined>;
 }
 
 /**

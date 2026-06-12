@@ -1,0 +1,4 @@
+Designator,Description,Manufacturer,MPN,Value,Footprint,Quantity
+U7,3A Step-Down Regulator,Texas Instruments,TPS54331DR,,SOIC-8,1
+R12,Resistor 10k 1%,Yageo,RC0402FR-0710KL,10k,0402,1
+C5,Capacitor 100nF 16V X7R,Murata,GRM155R71C104KA88D,100nF,0402,1
