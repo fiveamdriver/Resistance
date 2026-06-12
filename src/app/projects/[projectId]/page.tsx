@@ -84,6 +84,7 @@ export default async function ProjectDashboardPage({
   }
 
   return (
+    <div className="mx-auto max-w-6xl px-6 py-8">
     <div className="space-y-6">
       <div>
         <Link
@@ -103,6 +104,7 @@ export default async function ProjectDashboardPage({
       </div>
 
       <DashboardTabs vm={vm} />
+    </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { NewProjectForm } from "@/components/projects/new-project-form";
 
 export default function NewProjectPage() {
   return (
+    <div className="mx-auto max-w-6xl px-6 py-8">
     <div className="mx-auto max-w-xl space-y-6">
       <div>
         <Link
@@ -22,6 +23,7 @@ export default function NewProjectPage() {
       <div className="rounded-lg border border-slate-200 bg-white p-6">
         <NewProjectForm />
       </div>
+    </div>
     </div>
   );
 }

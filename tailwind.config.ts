@@ -8,10 +8,9 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Lightweight brand palette for the engineering-tool look & feel.
         brand: {
-          DEFAULT: "#2563eb",
-          dark: "#1e40af",
+          DEFAULT: "#00ff88",
+          dark: "#00cc70",
         },
       },
     },
