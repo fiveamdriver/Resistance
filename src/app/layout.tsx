@@ -16,34 +16,34 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen">
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <body className="min-h-screen bg-[#050505]">
+        <header className="sticky top-0 z-50 border-b border-[#0f1f0f] bg-[#050505]/95 backdrop-blur-sm">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
             <Link href="/" className="flex items-center gap-2">
-              <span className="text-lg font-bold text-brand">
+              <span className="text-lg font-bold text-white">
                 ⚡ Resistance
               </span>
-              <span className="hidden text-xs text-slate-400 sm:inline">
+              <span className="hidden text-xs text-[#4a5568] sm:inline">
                 EE Project Assistant
               </span>
             </Link>
             <nav className="flex items-center gap-4 text-sm">
               <Link
                 href="/projects"
-                className="text-slate-600 hover:text-brand"
+                className="text-[#94a3b8] transition-colors hover:text-white"
               >
                 Projects
               </Link>
               <Link
                 href="/projects/new"
-                className="rounded-md bg-brand px-3 py-1.5 font-medium text-white hover:bg-brand-dark"
+                className="rounded-md bg-white px-3 py-1.5 font-semibold text-black transition-colors hover:bg-white/90"
               >
                 New Project
               </Link>
             </nav>
           </div>
         </header>
-        <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+        <main>{children}</main>
       </body>
     </html>
   );
