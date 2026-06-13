@@ -21,7 +21,8 @@ body {
     sans-serif;
 }
 
-/* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+  scroll-snap-type: y mandatory;
+  overflow-y: scroll;
 }

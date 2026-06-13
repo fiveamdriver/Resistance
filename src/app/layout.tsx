@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import PCBBackground from "@/components/home/pcb-background";
 
 import "./globals.css";
 
@@ -43,7 +44,8 @@ export default function RootLayout({
             </nav>
           </div>
         </header>
-        <main>{children}</main>
+        <PCBBackground />
+        <main className="relative z-10">{children}</main>
       </body>
     </html>
   );

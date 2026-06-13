@@ -1,17 +1,12 @@
 import Link from "next/link";
-import PCBBackground from "@/components/home/pcb-background";
 import FeatureTabs from "@/components/home/feature-tabs";
 
 export default function HomePage() {
   return (
     <>
-      {/* Fixed canvas background — sits behind all sections */}
-      <PCBBackground />
-
-      {/* All page content in a stacking context above the canvas */}
+      {/* ── Hero ───────────────────────────────────────────────────────────── */}
       <div className="relative z-10">
-        {/* ── Hero ───────────────────────────────────────────────────────────── */}
-        <section className="relative flex min-h-[95vh] flex-col items-center justify-center px-6 pt-32 pb-20 text-center">
+        <section className="relative flex min-h-screen flex-col items-center justify-center px-6 pt-32 pb-20 text-center [scroll-snap-align:start] [scroll-snap-stop:always]">
           <span className="mb-6 inline-block rounded-full border border-[rgba(255,255,255,0.15)] px-3 py-1 text-xs font-medium text-[#6b7280]">
             Phase 1 · MVP foundation
           </span>
@@ -50,8 +45,10 @@ export default function HomePage() {
         </section>
 
         {/* ── Features ─────────────────────────────────────────────────────────── */}
-        <div className="min-h-[95vh]">
-          <FeatureTabs />
+        <div className="h-screen pt-12 [scroll-snap-align:start] [scroll-snap-stop:always]">
+          <div className="max-h-screen overflow-y-auto">
+            <FeatureTabs />
+          </div>
         </div>
       </div>
     </>

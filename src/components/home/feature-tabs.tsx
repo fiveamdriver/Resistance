@@ -232,26 +232,26 @@ const TABS = [
 
 export default function FeatureTabs() {
   return (
-    <section className="pt-10 pb-24">
+    <section className="pt-16 pb-4">
       <div className="mx-auto max-w-7xl px-6">
-        <div className="flex flex-col items-center gap-4 text-center">
+        <div className="flex flex-col items-center gap-2 text-center">
           <Badge variant="outline">Engineering Intelligence</Badge>
-          <h2 className="max-w-2xl text-3xl font-semibold text-white md:text-4xl">
+          <h2 className="max-w-2xl text-2xl font-semibold text-white md:text-3xl">
             Know your design. Navigate it.
           </h2>
-          <p className="max-w-xl text-[#94a3b8]">
+          <p className="max-w-xl text-sm text-[#94a3b8]">
             Purpose-built tools for electrical engineers working with complex PCB
             projects — from first schematic capture to design review.
           </p>
         </div>
 
-        <Tabs.Root defaultValue="knowledge" className="mt-12">
-          <Tabs.List className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
+        <Tabs.Root defaultValue="knowledge" className="mt-4">
+          <Tabs.List className="flex flex-wrap items-center justify-center gap-2">
             {TABS.map((tab) => (
               <Tabs.Trigger
                 key={tab.value}
                 value={tab.value}
-                className="flex items-center gap-2 rounded-lg border border-[rgba(255,255,255,0.1)] px-4 py-2.5 text-sm font-medium text-[#94a3b8] outline-none transition-all hover:border-[rgba(255,255,255,0.25)] hover:text-white data-[state=active]:border-[rgba(255,255,255,0.3)] data-[state=active]:bg-[rgba(255,255,255,0.06)] data-[state=active]:text-white"
+                className="flex items-center gap-2 rounded-lg border border-[rgba(255,255,255,0.1)] px-3 py-2 text-sm font-medium text-[#94a3b8] outline-none transition-all hover:border-[rgba(255,255,255,0.25)] hover:text-white data-[state=active]:border-[rgba(255,255,255,0.3)] data-[state=active]:bg-[rgba(255,255,255,0.06)] data-[state=active]:text-white"
               >
                 {tab.icon}
                 {tab.label}
@@ -259,22 +259,22 @@ export default function FeatureTabs() {
             ))}
           </Tabs.List>
 
-          <div className="mx-auto mt-6 max-w-5xl rounded-2xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.02)] p-6 lg:p-12">
+          <div className="mx-auto mt-4 max-w-5xl rounded-2xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.02)] p-4 lg:p-6">
             {TABS.map((tab) => (
               <Tabs.Content
                 key={tab.value}
                 value={tab.value}
-                className="grid place-items-center gap-12 outline-none lg:grid-cols-2 lg:gap-10"
+                className="grid place-items-center gap-6 outline-none lg:grid-cols-2 lg:gap-8"
               >
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3">
                   <Badge variant="outline" className="w-fit">
                     {tab.badge}
                   </Badge>
-                  <h3 className="text-2xl font-semibold text-white lg:text-4xl">
+                  <h3 className="text-xl font-semibold text-white lg:text-2xl">
                     {tab.title}
                   </h3>
-                  <p className="text-[#94a3b8] lg:text-base">{tab.description}</p>
-                  <button className="mt-2 w-fit rounded-md bg-white px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-white/90">
+                  <p className="text-sm text-[#94a3b8]">{tab.description}</p>
+                  <button className="mt-1 w-fit rounded-md bg-white px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-white/90">
                     {tab.buttonText}
                   </button>
                 </div>
