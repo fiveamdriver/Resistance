@@ -16,10 +16,10 @@ export default function HomePage() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#94a3b8]">
-            Resistance turns your Altium project exports — netlists, BOMs,
-            schematic PDFs, datasheets, and requirements — into a searchable
-            knowledge base, a connectivity graph, and an AI assistant built for
-            hardware engineers.
+            Drop in your Altium exports — netlists, BOMs, schematic PDFs,
+            datasheets, requirements — and Resistance builds you a dynamic,
+            interactive dashboard: searchable knowledge base, live connectivity
+            graph, and an AI assistant that actually understands your hardware.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">

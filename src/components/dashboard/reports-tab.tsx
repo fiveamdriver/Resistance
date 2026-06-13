@@ -1,9 +1,5 @@
 import type { DashboardVM } from "./view-models";
 
-/**
- * Reports tab — Phase 1 shows a project summary and previews the design-review
- * report generator planned for a later phase.
- */
 export function ReportsTab({ vm }: { vm: DashboardVM }) {
   const stats = [
     { label: "Files", value: vm.files.length },
@@ -19,18 +15,18 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
         {stats.map((s) => (
           <div
             key={s.label}
-            className="rounded-lg border border-slate-200 bg-white p-4 text-center"
+            className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4 text-center"
           >
-            <div className="text-2xl font-bold text-slate-900">{s.value}</div>
-            <div className="text-xs uppercase tracking-wide text-slate-500">
+            <div className="text-2xl font-bold text-white">{s.value}</div>
+            <div className="text-xs uppercase tracking-wide text-[#4a5568]">
               {s.label}
             </div>
           </div>
         ))}
       </div>
 
-      <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">
-        <p className="font-medium text-slate-700">
+      <div className="rounded-lg border border-dashed border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)] p-5 text-sm text-[#4a5568]">
+        <p className="font-medium text-[#94a3b8]">
           Design-review report generator (planned)
         </p>
         <p className="mt-1">

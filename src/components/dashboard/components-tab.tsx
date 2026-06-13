@@ -13,9 +13,9 @@ export function ComponentsTab({ components }: { components: ComponentVM[] }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-x-auto rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)]">
       <table className="w-full text-left text-sm">
-        <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+        <thead className="border-b border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-xs uppercase tracking-wide text-[#4a5568]">
           <tr>
             <th className="px-4 py-2.5 font-medium">RefDes</th>
             <th className="px-4 py-2.5 font-medium">Name</th>
@@ -25,19 +25,17 @@ export function ComponentsTab({ components }: { components: ComponentVM[] }) {
             <th className="px-4 py-2.5 font-medium">BOM</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-[rgba(255,255,255,0.06)]">
           {components.map((c) => (
-            <tr key={c.id} className="hover:bg-slate-50">
-              <td className="px-4 py-2.5 font-mono font-medium text-slate-800">
+            <tr key={c.id} className="transition hover:bg-[rgba(255,255,255,0.03)]">
+              <td className="px-4 py-2.5 font-mono font-medium text-white">
                 {c.refDes}
               </td>
-              <td className="px-4 py-2.5 text-slate-600">{c.name ?? "—"}</td>
-              <td className="px-4 py-2.5 text-slate-600">{c.value ?? "—"}</td>
-              <td className="px-4 py-2.5 text-slate-600">
-                {c.footprint ?? "—"}
-              </td>
-              <td className="px-4 py-2.5 text-slate-600">{c.pinCount}</td>
-              <td className="px-4 py-2.5 text-slate-600">{c.bomCount}</td>
+              <td className="px-4 py-2.5 text-[#94a3b8]">{c.name ?? "—"}</td>
+              <td className="px-4 py-2.5 text-[#94a3b8]">{c.value ?? "—"}</td>
+              <td className="px-4 py-2.5 text-[#94a3b8]">{c.footprint ?? "—"}</td>
+              <td className="px-4 py-2.5 text-[#94a3b8]">{c.pinCount}</td>
+              <td className="px-4 py-2.5 text-[#94a3b8]">{c.bomCount}</td>
             </tr>
           ))}
         </tbody>

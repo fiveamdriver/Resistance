@@ -13,9 +13,9 @@ export function BomTab({ bomItems }: { bomItems: BomItemVM[] }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-x-auto rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)]">
       <table className="w-full text-left text-sm">
-        <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+        <thead className="border-b border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-xs uppercase tracking-wide text-[#4a5568]">
           <tr>
             <th className="px-4 py-2.5 font-medium">RefDes</th>
             <th className="px-4 py-2.5 font-medium">Description</th>
@@ -25,23 +25,17 @@ export function BomTab({ bomItems }: { bomItems: BomItemVM[] }) {
             <th className="px-4 py-2.5 font-medium">Matched</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-[rgba(255,255,255,0.06)]">
           {bomItems.map((item) => (
-            <tr key={item.id} className="hover:bg-slate-50">
-              <td className="px-4 py-2.5 font-mono text-slate-800">
+            <tr key={item.id} className="transition hover:bg-[rgba(255,255,255,0.03)]">
+              <td className="px-4 py-2.5 font-mono text-white">
                 {item.refDesRaw ?? "—"}
               </td>
-              <td className="px-4 py-2.5 text-slate-600">
-                {item.description ?? "—"}
-              </td>
-              <td className="px-4 py-2.5 text-slate-600">
-                {item.manufacturer ?? "—"}
-              </td>
-              <td className="px-4 py-2.5 font-mono text-slate-600">
-                {item.mpn ?? "—"}
-              </td>
-              <td className="px-4 py-2.5 text-slate-600">{item.quantity}</td>
-              <td className="px-4 py-2.5 text-slate-600">
+              <td className="px-4 py-2.5 text-[#94a3b8]">{item.description ?? "—"}</td>
+              <td className="px-4 py-2.5 text-[#94a3b8]">{item.manufacturer ?? "—"}</td>
+              <td className="px-4 py-2.5 font-mono text-[#94a3b8]">{item.mpn ?? "—"}</td>
+              <td className="px-4 py-2.5 text-[#94a3b8]">{item.quantity}</td>
+              <td className="px-4 py-2.5 text-[#94a3b8]">
                 {item.componentRefs.length > 0
                   ? item.componentRefs.join(", ")
                   : "—"}

@@ -37,7 +37,7 @@ export function AiAssistant() {
   }
 
   return (
-    <div className="flex h-[28rem] flex-col rounded-lg border border-slate-200 bg-white">
+    <div className="flex h-[28rem] flex-col rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)]">
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {messages.map((m, i) => (
           <div
@@ -48,7 +48,7 @@ export function AiAssistant() {
               className={`inline-block max-w-[80%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm ${
                 m.role === "user"
                   ? "bg-brand text-white"
-                  : "bg-slate-100 text-slate-700"
+                  : "border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.04)] text-[#94a3b8]"
               }`}
             >
               {m.text}
@@ -57,13 +57,13 @@ export function AiAssistant() {
         ))}
       </div>
 
-      <div className="border-t border-slate-100 p-3">
+      <div className="border-t border-[rgba(255,255,255,0.06)] p-3">
         <div className="mb-2 flex flex-wrap gap-1.5">
           {SUGGESTIONS.map((s) => (
             <button
               key={s}
               onClick={() => send(s)}
-              className="rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:border-brand hover:text-brand"
+              className="rounded-full border border-[rgba(255,255,255,0.08)] px-2.5 py-1 text-xs text-[#94a3b8] transition-colors hover:border-brand hover:text-brand"
             >
               {s}
             </button>
@@ -80,11 +80,11 @@ export function AiAssistant() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about your project…"
-            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+            className="flex-1 rounded-md border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-sm text-white placeholder:text-[#2a2a35] outline-none transition focus:border-[rgba(255,255,255,0.3)] focus:ring-1 focus:ring-[rgba(255,255,255,0.1)]"
           />
           <button
             type="submit"
-            className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+            className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark"
           >
             Send
           </button>

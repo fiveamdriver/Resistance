@@ -15,9 +15,9 @@ export function FilesTable({ files }: { files: FileVM[] }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-x-auto rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)]">
       <table className="w-full text-left text-sm">
-        <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+        <thead className="border-b border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-xs uppercase tracking-wide text-[#4a5568]">
           <tr>
             <th className="px-4 py-2.5 font-medium">File</th>
             <th className="px-4 py-2.5 font-medium">Category</th>
@@ -26,22 +26,22 @@ export function FilesTable({ files }: { files: FileVM[] }) {
             <th className="px-4 py-2.5 font-medium">Uploaded</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-[rgba(255,255,255,0.05)]">
           {files.map((file) => (
-            <tr key={file.id} className="hover:bg-slate-50">
-              <td className="px-4 py-2.5 font-medium text-slate-800">
+            <tr key={file.id} className="transition hover:bg-[rgba(255,255,255,0.03)]">
+              <td className="px-4 py-2.5 font-medium text-white">
                 {file.originalName}
               </td>
-              <td className="px-4 py-2.5 capitalize text-slate-600">
+              <td className="px-4 py-2.5 capitalize text-[#94a3b8]">
                 {file.category}
               </td>
-              <td className="px-4 py-2.5 text-slate-600">
+              <td className="px-4 py-2.5 text-[#94a3b8]">
                 {formatBytes(file.sizeBytes)}
               </td>
               <td className="px-4 py-2.5">
                 <ParseStatusBadge status={file.parseStatus} />
               </td>
-              <td className="px-4 py-2.5 text-slate-500">
+              <td className="px-4 py-2.5 text-[#4a5568]">
                 {formatDate(file.uploadedAt)}
               </td>
             </tr>
