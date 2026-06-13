@@ -1,15 +1,16 @@
 /**
  * File domain service.
  *
- * Orchestrates the upload pipeline: validate -> store on disk -> record in DB.
- * Parsing is intentionally decoupled (see `parsers/`) and only dispatched as a
- * placeholder in Phase 1.
+ * Orchestrates the upload pipeline: validate -> store on disk -> record in DB
+ * -> parse (netlist / BOM) -> update parseStatus.
  */
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/errors";
 import { categorizeFile } from "@/lib/fileTypes";
+import { parseBomFile } from "@/lib/parsers/bomParser";
+import { parseNetlistFile } from "@/lib/parsers/netlistParser";
 import { saveUploadedFile } from "@/lib/storage";
 import { parseOrThrow, uploadFileMetaSchema } from "@/lib/validation";
 
@@ -22,9 +23,12 @@ export interface UploadOutcome {
 }
 
 /**
- * Validate and store a batch of uploaded files for a project. Each file is
- * handled independently so one bad file doesn't abort the rest; the caller gets
- * a per-file outcome to surface in the UI.
+ * Validate and store a batch of uploaded files for a project, then parse any
+ * netlist or BOM files. Each file is handled independently so one failure
+ * doesn't abort the rest. The caller gets a per-file outcome for the UI.
+ *
+ * Storage failures → ok: false (file not stored, no DB record).
+ * Parse failures   → ok: true (file stored, parseStatus: "failed" in DB).
  */
 export async function uploadFiles(
   projectId: string,
@@ -35,33 +39,35 @@ export async function uploadFiles(
   const outcomes: UploadOutcome[] = [];
 
   for (const file of files) {
+    const category = categorizeFile(file.name);
+
+    // ── Step 1: validate + store + create DB record ───────────────────────
+    let projectFileId: string;
+    let absolutePath: string;
+
     try {
-      // 1. Validate type + size before touching disk.
       parseOrThrow(
         uploadFileMetaSchema,
         { name: file.name, size: file.size },
         `"${file.name}" could not be uploaded`
       );
 
-      // 2. Persist bytes under a server-generated, collision-safe name.
       const stored = await saveUploadedFile(projectId, file);
+      absolutePath = stored.absolutePath;
 
-      // 3. Record metadata. parseStatus starts "pending" — real parsing is a
-      //    Phase 2 background job (see parsers/index.ts::dispatchParse).
-      await prisma.projectFile.create({
+      const record = await prisma.projectFile.create({
         data: {
           projectId,
           originalName: file.name,
           storedName: stored.storedName,
           path: stored.relativePath,
-          fileType: file.type || categorizeFile(file.name),
-          category: categorizeFile(file.name),
+          fileType: file.type || category,
+          category,
           sizeBytes: stored.sizeBytes,
           parseStatus: "pending",
         },
       });
-
-      outcomes.push({ fileName: file.name, ok: true });
+      projectFileId = record.id;
     } catch (error) {
       outcomes.push({
         fileName: file.name,
@@ -71,6 +77,35 @@ export async function uploadFiles(
             ? error.message
             : "Upload failed unexpectedly",
       });
+      continue;
+    }
+
+    outcomes.push({ fileName: file.name, ok: true });
+
+    // ── Step 2: parse (netlist / BOM only) ────────────────────────────────
+    // Failures update parseStatus in the DB but don't fail the upload outcome;
+    // the parse status badge in the files table communicates the result.
+    if (category === "netlist" || category === "bom") {
+      try {
+        if (category === "netlist") {
+          await parseNetlistFile(projectId, absolutePath);
+        } else {
+          await parseBomFile(projectId, absolutePath);
+        }
+        await prisma.projectFile.update({
+          where: { id: projectFileId },
+          data: { parseStatus: "parsed" },
+        });
+      } catch (err) {
+        await prisma.projectFile.update({
+          where: { id: projectFileId },
+          data: {
+            parseStatus: "failed",
+            parseError:
+              err instanceof Error ? err.message : "Unexpected parse error",
+          },
+        });
+      }
     }
   }
 

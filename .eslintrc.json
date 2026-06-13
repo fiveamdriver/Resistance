@@ -7,5 +7,5 @@
       { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
     ]
   },
-  "ignorePatterns": ["node_modules", ".next", "src/generated"]
+  "ignorePatterns": ["node_modules", ".next"]
 }

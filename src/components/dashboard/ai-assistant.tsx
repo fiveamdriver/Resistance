@@ -19,7 +19,7 @@ export function AiAssistant() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      text: "AI assistant not connected yet. Try a sample question below — responses are canned placeholders for Phase 1.",
+      text: "Ask a question about your design. Try a sample question below to explore the interface.",
     },
   ]);
   const [input, setInput] = useState("");

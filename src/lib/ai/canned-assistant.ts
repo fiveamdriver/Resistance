@@ -1,15 +1,13 @@
 /**
- * Placeholder AI assistant logic (Phase 1).
+ * AI assistant stub.
  *
- * No LLM is called. This module maps a user question to a canned response and,
- * where possible, names the future agent tool that would handle it. Keeping the
- * routing here (not in the component) makes it unit-testable and makes the seam
- * for a real LLM provider obvious: replace `getCannedResponse` with a call to
- * the agent runtime, reusing the same tool names.
+ * Routes questions to their intended agent tool before the LLM is wired up.
+ * Replace getCannedResponse() with a call to the agent runtime when ready —
+ * the tool names and AssistantReply interface stay the same.
  */
 
-/** Tool names the future AI agent will expose. */
-export const FUTURE_TOOLS = [
+/** Tool names the AI agent will expose. */
+export const AGENT_TOOLS = [
   "search_component",
   "search_net",
   "get_connected_components",
@@ -18,18 +16,18 @@ export const FUTURE_TOOLS = [
   "review_design_risks",
 ] as const;
 
-export type FutureTool = (typeof FUTURE_TOOLS)[number];
+export type AgentTool = (typeof AGENT_TOOLS)[number];
 
 export interface AssistantReply {
   text: string;
-  suggestedTool?: FutureTool;
+  suggestedTool?: AgentTool;
 }
 
-const NOT_CONNECTED =
-  "AI assistant not connected yet. This is a Phase 1 placeholder — no LLM is wired up.";
+const RESPONSE_NOT_CONFIGURED =
+  "The AI assistant is not yet configured. Live answers from your design data will appear here once the LLM integration is complete.";
 
 /** Heuristically map a question to the tool that will eventually answer it. */
-function routeToTool(question: string): FutureTool | undefined {
+function routeToTool(question: string): AgentTool | undefined {
   const q = question.toLowerCase();
   if (/\bconnect|connected|connects\b/.test(q))
     return "get_connected_components";
@@ -48,11 +46,5 @@ export function getCannedResponse(question: string): AssistantReply {
   }
 
   const suggestedTool = routeToTool(trimmed);
-  if (suggestedTool) {
-    return {
-      text: `${NOT_CONNECTED}\n\nFuture tool: ${suggestedTool}`,
-      suggestedTool,
-    };
-  }
-  return { text: NOT_CONNECTED };
+  return { text: RESPONSE_NOT_CONFIGURED, suggestedTool };
 }

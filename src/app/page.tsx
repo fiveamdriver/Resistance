@@ -8,7 +8,7 @@ export default function HomePage() {
       <div className="relative z-10">
         <section className="relative flex min-h-screen flex-col items-center justify-center px-6 pt-32 pb-20 text-center [scroll-snap-align:start] [scroll-snap-stop:always]">
           <span className="mb-6 inline-block rounded-full border border-[rgba(255,255,255,0.15)] px-3 py-1 text-xs font-medium text-[#6b7280]">
-            Phase 1 · MVP foundation
+            Beta · Altium export intelligence
           </span>
 
           <h1 className="max-w-4xl text-5xl font-bold tracking-tight text-white sm:text-6xl md:text-7xl">

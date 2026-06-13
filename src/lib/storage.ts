@@ -1,9 +1,9 @@
 /**
- * Local file storage helpers (Phase 1).
+ * Local file storage helpers.
  *
  * Files are written to an on-disk uploads directory (default: `/uploads`).
- * In a later phase this module is the single seam to swap for S3 / GCS /
- * blob storage — keep all disk access behind these functions.
+ * This module is the single seam to swap for S3 / GCS / blob storage —
+ * keep all disk I/O behind these functions.
  */
 import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";

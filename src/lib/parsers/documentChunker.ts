@@ -1,9 +1,9 @@
 /**
- * Document chunker — minimal real implementation (no external deps).
+ * Document chunker for RAG pipelines.
  *
- * Splits text into overlapping chunks suitable for future embedding + RAG.
- * The interface is stable; the splitting strategy can be upgraded later
- * (token-aware, semantic boundaries) without changing callers.
+ * Splits text into overlapping character-window chunks suitable for embedding.
+ * The interface is stable; the splitting strategy (token-aware, semantic
+ * boundaries, page provenance) can be upgraded without changing callers.
  */
 
 export interface DocumentChunkData {
@@ -19,12 +19,7 @@ export interface ChunkOptions {
   overlap?: number;
 }
 
-/**
- * Split text into overlapping character-window chunks.
- *
- * TODO(phase 2): make this token-aware and prefer paragraph/sentence
- * boundaries; attach page numbers from parsePdf() for citation support.
- */
+/** Split text into overlapping character-window chunks. */
 export function chunkDocument(
   text: string,
   options: ChunkOptions = {}

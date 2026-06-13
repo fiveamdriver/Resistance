@@ -7,7 +7,7 @@ export function BomTab({ bomItems }: { bomItems: BomItemVM[] }) {
     return (
       <EmptyState
         title="No BOM items yet"
-        hint="Upload a .csv or .xlsx BOM; rows appear here once parsed (Phase 2)."
+        hint="Upload a .csv or .xlsx BOM file to populate this table."
       />
     );
   }

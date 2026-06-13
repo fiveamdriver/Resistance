@@ -1,10 +1,10 @@
 /**
  * Connectivity domain service.
  *
- * Builds the in-memory `ConnectivityGraph` (see types/connectivity.ts) from
- * persisted Components/Nets/Pins/Connections. This is the seam the future graph
- * visualization and AI tools (search_component / search_net /
- * get_connected_components) will consume.
+ * Builds the in-memory ConnectivityGraph (see types/connectivity.ts) from
+ * persisted Components/Nets/Pins/Connections. Consumed by the connectivity
+ * graph visualization and AI agent tools (search_component, search_net,
+ * get_connected_components).
  */
 import "server-only";
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import PCBBackground from "@/components/home/pcb-background";
+import DitheringBackground from "@/components/home/dithering-background";
 
 import "./globals.css";
 
@@ -44,7 +44,7 @@ export default function RootLayout({
             </nav>
           </div>
         </header>
-        <PCBBackground />
+        <DitheringBackground />
         <main className="relative z-10">{children}</main>
       </body>
     </html>

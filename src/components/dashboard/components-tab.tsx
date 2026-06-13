@@ -7,7 +7,7 @@ export function ComponentsTab({ components }: { components: ComponentVM[] }) {
     return (
       <EmptyState
         title="No components yet"
-        hint="Components will appear here once a netlist is parsed (Phase 2)."
+        hint="Upload a netlist file to populate the components table."
       />
     );
   }

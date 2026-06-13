@@ -7,7 +7,7 @@ export function NetsTab({ nets }: { nets: NetVM[] }) {
     return (
       <EmptyState
         title="No nets yet"
-        hint="Nets will appear here once a netlist is parsed (Phase 2)."
+        hint="Upload a netlist file to populate the nets table."
       />
     );
   }

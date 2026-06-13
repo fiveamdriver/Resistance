@@ -26,13 +26,11 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
       </div>
 
       <div className="rounded-lg border border-dashed border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)] p-5 text-sm text-[#4a5568]">
-        <p className="font-medium text-[#94a3b8]">
-          Design-review report generator (planned)
-        </p>
+        <p className="font-medium text-[#94a3b8]">Design Review Report</p>
         <p className="mt-1">
-          A future phase will analyze connectivity and BOM data to flag risks a
-          human engineer should check — unconnected pins, missing decoupling,
-          power-net fan-out, and BOM/schematic mismatches.
+          Automatic risk analysis coming soon — this report will flag connectivity
+          issues, BOM mismatches, unconnected pins, and design-rule violations
+          based on your uploaded files.
         </p>
       </div>
     </div>

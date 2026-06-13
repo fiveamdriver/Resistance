@@ -7,10 +7,8 @@ describe("getCannedResponse", () => {
     expect(getCannedResponse("  ").text).toMatch(/get started/i);
   });
 
-  it("always states the assistant is not connected", () => {
-    expect(getCannedResponse("What connects to U7?").text).toMatch(
-      /not connected yet/i
-    );
+  it("returns a response when AI is not yet configured", () => {
+    expect(getCannedResponse("What connects to U7?").text).toMatch(/not yet configured/i);
   });
 
   it("routes connectivity questions to get_connected_components", () => {

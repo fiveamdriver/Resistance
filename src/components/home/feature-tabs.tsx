@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import * as Tabs from "@radix-ui/react-tabs";
 import { BookOpen, GitBranch, Table2, MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -274,9 +275,12 @@ export default function FeatureTabs() {
                     {tab.title}
                   </h3>
                   <p className="text-sm text-[#94a3b8]">{tab.description}</p>
-                  <button className="mt-1 w-fit rounded-md bg-white px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-white/90">
+                  <Link
+                    href="/projects"
+                    className="mt-1 w-fit rounded-md bg-white px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+                  >
                     {tab.buttonText}
-                  </button>
+                  </Link>
                 </div>
                 <div className="w-full">{tab.visual}</div>
               </Tabs.Content>

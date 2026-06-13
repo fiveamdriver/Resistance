@@ -1,8 +1,8 @@
 /**
  * File type / category definitions.
  *
- * Phase 1 keeps these as plain string unions (mirrored by string columns in the
- * Prisma schema) so the data model stays Postgres-portable without enums.
+ * Plain string unions mirrored by string columns in the Prisma schema keep the
+ * data model Postgres-portable without enum migrations.
  */
 
 export type FileCategory = "netlist" | "bom" | "pdf" | "document" | "other";
@@ -43,8 +43,8 @@ export function getExtension(filename: string): string {
 
 /**
  * Map a filename to a category. `.txt` is ambiguous between a netlist and a
- * plain document; we default it to "document" but a caller (or the future
- * parser dispatcher) can override based on content sniffing.
+ * plain document; defaults to "document" but callers can override based on
+ * content sniffing.
  */
 export function categorizeFile(filename: string): FileCategory {
   const ext = getExtension(filename);
