@@ -11,7 +11,7 @@ export default function HomePage() {
       {/* All page content in a stacking context above the canvas */}
       <div className="relative z-10">
         {/* ── Hero ───────────────────────────────────────────────────────────── */}
-        <section className="flex flex-col items-center justify-center px-6 pt-32 pb-20 text-center">
+        <section className="relative flex min-h-[95vh] flex-col items-center justify-center px-6 pt-32 pb-20 text-center">
           <span className="mb-6 inline-block rounded-full border border-[rgba(255,255,255,0.15)] px-3 py-1 text-xs font-medium text-[#6b7280]">
             Phase 1 · MVP foundation
           </span>
@@ -41,37 +41,18 @@ export default function HomePage() {
               Create a project
             </Link>
           </div>
+
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce opacity-25">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M5 7.5L10 12.5L15 7.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
         </section>
 
         {/* ── Features ─────────────────────────────────────────────────────────── */}
-        <FeatureTabs />
-
-        {/* ── Questions strip ──────────────────────────────────────────────────── */}
-        <section className="py-20">
-          <div className="mx-auto max-w-5xl px-6">
-            <h2 className="text-center text-xs font-semibold uppercase tracking-widest text-[#4a5568]">
-              Questions it will answer
-            </h2>
-            <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {[
-                "What connects to U7?",
-                "What components are on the 5V rail?",
-                "What nets connect to this IC?",
-                "Which BOM rows match this component?",
-                "Which datasheets belong to these parts?",
-                "What design-review risks should I check?",
-              ].map((q) => (
-                <li
-                  key={q}
-                  className="flex items-start gap-3 rounded-lg border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-4 py-3"
-                >
-                  <span className="mt-px font-mono text-sm text-[#4a5568]">›</span>
-                  <span className="text-sm text-[#94a3b8]">{q}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
+        <div className="min-h-[95vh]">
+          <FeatureTabs />
+        </div>
       </div>
     </>
   );
