@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   Background,
   BackgroundVariant,
@@ -249,6 +249,21 @@ function buildFlowElements(
 
 export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.toggle("graph-fullscreen", isFullscreen);
+    return () => document.body.classList.remove("graph-fullscreen");
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isFullscreen]);
 
   const { nodes, edges } = useMemo(
     () => buildFlowElements(graph, focusedId),
@@ -287,9 +302,9 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
     graph.connections.map((c) => `${c.componentRefDes}→${c.netName}`)
   ).size;
 
-  return (
-    <div className="space-y-2">
-      {/* Legend + focus readout */}
+  const inner = (
+    <div className={isFullscreen ? "flex h-full flex-col gap-2" : "space-y-2"}>
+      {/* Legend + focus readout + fullscreen toggle */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#4a5568]">
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1.5">
@@ -302,17 +317,34 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
           </span>
           <span className="text-[#2a2a35]">Click a node to trace connections · click again to clear</span>
         </div>
-        {focusDetail && (
-          <span className="rounded border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-2 py-0.5 font-mono text-[#94a3b8]">
-            {focusDetail}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {focusDetail && (
+            <span className="rounded border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-2 py-0.5 font-mono text-[#94a3b8]">
+              {focusDetail}
+            </span>
+          )}
+          <button
+            onClick={() => setIsFullscreen((v) => !v)}
+            title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
+            className="rounded border border-[rgba(255,255,255,0.08)] bg-[rgba(8,8,8,0.95)] p-1.5 text-[#64748b] transition-colors hover:border-[rgba(255,255,255,0.15)] hover:text-[#e2e8f0]"
+          >
+            {isFullscreen ? (
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M6 2L2 2L2 6M10 2L14 2L14 6M6 14L2 14L2 10M10 14L14 14L14 10" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Graph */}
       <div
         className="overflow-hidden rounded-lg border border-[rgba(255,255,255,0.08)]"
-        style={{ height: 460 }}
+        style={isFullscreen ? { flex: 1 } : { height: 460 }}
       >
         <ReactFlow
           nodes={nodes}
@@ -348,4 +380,14 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
       </p>
     </div>
   );
+
+  if (isFullscreen) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex flex-col bg-[#050505] p-4">
+        {inner}
+      </div>
+    );
+  }
+
+  return inner;
 }

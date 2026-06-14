@@ -32,3 +32,7 @@ html {
 .react-flow__attribution a {
   color: #1e2a35;
 }
+
+body.graph-fullscreen header {
+  display: none;
+}

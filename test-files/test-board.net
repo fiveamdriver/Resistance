@@ -1,0 +1,118 @@
+(
+NETLIST HEADER
+Written by Altium Designer 23.0
+3V3 Power Supply Board Rev A
+)
+
+[
+C1
+C_0805_2012Metric
+10uF 16V X5R Capacitor
+]
+
+[
+C2
+C_0402_1005Metric
+100nF 16V X7R Capacitor
+]
+
+[
+C3
+C_0805_2012Metric
+10uF 6.3V X5R Capacitor
+]
+
+[
+C4
+C_0402_1005Metric
+100nF 16V X7R Capacitor
+]
+
+[
+D1
+D_SMA
+SS14 Schottky Diode 40V 1A
+]
+
+[
+F1
+Fuse_1812_4532Metric
+MF-R110 Resettable Fuse 1.1A
+]
+
+[
+J1
+TerminalBlock_Phoenix_PT-5mm_1x02
+12V Input Connector
+]
+
+[
+J2
+TerminalBlock_Phoenix_PT-5mm_1x02
+3.3V Output Connector
+]
+
+[
+LED1
+LED_0805_2012Metric
+LED Green
+]
+
+[
+R1
+R_0402_1005Metric
+1k 1% 0.1W Resistor
+]
+
+[
+U1
+SOT-23-3
+MCP1700T-3302E/TT 3.3V LDO Regulator
+]
+
+(
+GND
+J1-2
+J2-2
+U1-1
+C1-2
+C2-2
+C3-2
+C4-2
+LED1-2
+)
+
+(
+VIN_RAW
+J1-1
+F1-1
+)
+
+(
+VIN_FUSED
+F1-2
+D1-1
+)
+
+(
+VIN
+D1-2
+C1-1
+C2-1
+U1-3
+)
+
+(
+3V3
+U1-2
+C3-1
+C4-1
+J2-1
+R1-1
+)
+
+(
+LED_A
+R1-2
+LED1-1
+)

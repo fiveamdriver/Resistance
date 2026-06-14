@@ -39,7 +39,7 @@ export default function HomePage() {
                 </Link>
                 <Link
                   href="/projects/new"
-                  className="rounded-md border border-[#F5F0E8]/20 px-6 py-2.5 text-sm font-semibold text-[#F5F0E8] transition-all hover:border-[#F5F0E8]/40 hover:bg-[#F5F0E8]/5"
+                  className="rounded-md border border-[#F5F0E8]/20 px-6 py-2.5 text-sm font-semibold bg-[#F5F0E8] text-black transition-all hover:border-[#F5F0E8]/40 hover:bg-[#F5F0E8]/5"
                 >
                   New project
                 </Link>
