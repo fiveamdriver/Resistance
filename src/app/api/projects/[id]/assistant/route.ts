@@ -1,5 +1,5 @@
 /**
- * POST /api/projects/[projectId]/assistant
+ * POST /api/projects/[id]/assistant
  *
  * Tier-1 grounded-retrieval AI assistant. Runs a tool-use loop against the
  * board-query tools (netlist + BOM data) and streams the final answer as
@@ -56,9 +56,9 @@ const MAX_TOOL_ROUNDS = 6;
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { projectId } = await params;
+  const { id: projectId } = await params;
 
   let body: { messages: Anthropic.Messages.MessageParam[] };
   try {
