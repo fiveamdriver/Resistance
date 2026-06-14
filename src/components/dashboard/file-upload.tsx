@@ -19,7 +19,7 @@ function UploadButton() {
       type="submit"
       disabled={pending}
       onClick={(e) => e.stopPropagation()}
-      className="shrink-0 rounded border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.05)] px-3 py-1.5 text-xs font-medium text-[#94a3b8] transition-colors hover:bg-[rgba(255,255,255,0.09)] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+      className="shrink-0 rounded border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.05)] px-3 py-1.5 text-xs font-medium text-[#94a3b8] transition-colors hover:bg-[rgba(255,255,255,0.09)] hover:text-[#F5F0E8] disabled:cursor-not-allowed disabled:opacity-60"
     >
       {pending ? "Uploading…" : "Upload files"}
     </button>
@@ -71,8 +71,8 @@ export function FileUpload({ projectId }: { projectId: string }) {
           <div className="min-w-0 flex-1">
             <p className="text-sm text-[#94a3b8]">
               {fileCount > 0
-                ? <><span className="font-medium text-white">{fileCount} file{fileCount > 1 ? "s" : ""} selected</span> — click to change</>
-                : <>Drop files or <span className="font-medium text-white">browse</span></>
+                ? <><span className="font-medium text-[#F5F0E8]">{fileCount} file{fileCount > 1 ? "s" : ""} selected</span> — click to change</>
+                : <>Drop files or <span className="font-medium text-[#F5F0E8]">browse</span></>
               }
             </p>
             <p className="text-xs text-[#4a5568]">

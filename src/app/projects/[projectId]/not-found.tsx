@@ -11,7 +11,7 @@ export default function ProjectNotFound() {
       </p>
       <Link
         href="/projects"
-        className="mt-4 inline-block rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+        className="mt-4 inline-block rounded-md bg-brand px-4 py-2 text-sm font-medium text-[#F5F0E8] hover:bg-brand-dark"
       >
         Back to projects
       </Link>

@@ -89,11 +89,11 @@ export default async function ProjectDashboardPage({
         <div>
           <Link
             href="/projects"
-            className="text-sm text-[#4a5568] transition-colors hover:text-white"
+            className="text-sm text-[#4a5568] transition-colors hover:text-[#F5F0E8]"
           >
             ← All projects
           </Link>
-          <h1 className="mt-2 text-2xl font-bold text-white">
+          <h1 className="mt-2 text-2xl font-bold text-[#F5F0E8]">
             {vm.project.name}
           </h1>
           {vm.project.description && (

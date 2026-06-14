@@ -28,7 +28,7 @@ export function BomTab({ bomItems }: { bomItems: BomItemVM[] }) {
         <tbody className="divide-y divide-[rgba(255,255,255,0.06)]">
           {bomItems.map((item) => (
             <tr key={item.id} className="transition hover:bg-[rgba(255,255,255,0.03)]">
-              <td className="px-4 py-2.5 font-mono text-white">
+              <td className="px-4 py-2.5 font-mono text-[#F5F0E8]">
                 {item.refDesRaw ?? "—"}
               </td>
               <td className="px-4 py-2.5 text-[#94a3b8]">{item.description ?? "—"}</td>
