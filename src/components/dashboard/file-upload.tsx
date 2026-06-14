@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { Upload } from "lucide-react";
 
 import {
   uploadFilesAction,
@@ -17,7 +18,8 @@ function UploadButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+      onClick={(e) => e.stopPropagation()}
+      className="shrink-0 rounded border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.05)] px-3 py-1.5 text-xs font-medium text-[#94a3b8] transition-colors hover:bg-[rgba(255,255,255,0.09)] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
     >
       {pending ? "Uploading…" : "Upload files"}
     </button>
@@ -28,31 +30,67 @@ export function FileUpload({ projectId }: { projectId: string }) {
   const action = uploadFilesAction.bind(null, projectId);
   const [state, formAction] = useActionState(action, initialState);
   const formRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [fileCount, setFileCount] = useState(0);
 
   const failures = state.outcomes.filter((o) => !o.ok);
   const successes = state.outcomes.filter((o) => o.ok);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <form
         ref={formRef}
         action={async (formData) => {
           await formAction(formData);
           formRef.current?.reset();
+          setFileCount(0);
         }}
-        className="flex flex-wrap items-center gap-3 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4"
       >
+        <div
+          onClick={() => inputRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (inputRef.current && e.dataTransfer.files.length) {
+              const dt = new DataTransfer();
+              Array.from(e.dataTransfer.files).forEach((f) => dt.items.add(f));
+              inputRef.current.files = dt.files;
+              setFileCount(dt.files.length);
+            }
+          }}
+          className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors ${
+            dragging
+              ? "border-[rgba(255,255,255,0.2)] bg-[rgba(255,255,255,0.04)]"
+              : "border-dashed border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)] hover:border-[rgba(255,255,255,0.16)] hover:bg-[rgba(255,255,255,0.03)]"
+          }`}
+        >
+          <Upload className="h-4 w-4 shrink-0 text-[#4a5568]" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-[#94a3b8]">
+              {fileCount > 0
+                ? <><span className="font-medium text-white">{fileCount} file{fileCount > 1 ? "s" : ""} selected</span> — click to change</>
+                : <>Drop files or <span className="font-medium text-white">browse</span></>
+              }
+            </p>
+            <p className="text-xs text-[#4a5568]">
+              .net · .txt · .csv · .xlsx · .pdf · .md · .docx · max 25 MB
+            </p>
+          </div>
+          <UploadButton />
+        </div>
+
         <input
+          ref={inputRef}
           type="file"
           name="files"
           multiple
           accept={ACCEPT_ATTR}
-          className="text-sm text-[#94a3b8] file:mr-3 file:rounded-md file:border-0 file:bg-[rgba(255,255,255,0.08)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-[rgba(255,255,255,0.12)]"
+          className="hidden"
+          onChange={(e) => setFileCount(e.target.files?.length ?? 0)}
         />
-        <UploadButton />
-        <p className="w-full text-xs text-[#4a5568]">
-          Accepted: .net, .txt, .csv, .xlsx, .pdf, .md, .docx · max 25 MB each
-        </p>
       </form>
 
       {state.error && (

@@ -6,7 +6,7 @@ export default function DitheringBackground() {
   return (
     <Dithering
       colorBack="#000a05"
-      colorFront="#024d1f"
+      colorFront="#19375e"
       shape="warp"
       type="4x4"
       speed={0.2}
