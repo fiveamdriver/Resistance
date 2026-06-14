@@ -237,7 +237,7 @@ export default function FeatureTabs() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex flex-col items-center gap-2 text-center">
           <Badge variant="outline">Engineering Intelligence</Badge>
-          <h2 className="max-w-2xl text-2xl font-semibold text-white md:text-3xl">
+          <h2 className="max-w-2xl text-2xl font-semibold text-[#F5F0E8] md:text-3xl">
             Know your design. Navigate it.
           </h2>
           <p className="max-w-xl text-sm text-[#94a3b8]">
@@ -252,7 +252,7 @@ export default function FeatureTabs() {
               <Tabs.Trigger
                 key={tab.value}
                 value={tab.value}
-                className="flex items-center gap-2 rounded-lg border border-[rgba(255,255,255,0.1)] px-3 py-2 text-sm font-medium text-[#94a3b8] outline-none transition-all hover:border-[rgba(255,255,255,0.25)] hover:text-white data-[state=active]:border-[rgba(255,255,255,0.3)] data-[state=active]:bg-[rgba(255,255,255,0.06)] data-[state=active]:text-white"
+                className="flex items-center gap-2 rounded-lg border border-[rgba(255,255,255,0.1)] px-3 py-2 text-sm font-medium text-[#94a3b8] outline-none transition-all hover:border-[rgba(255,255,255,0.25)] hover:text-[#F5F0E8] data-[state=active]:border-[rgba(255,255,255,0.3)] data-[state=active]:bg-[rgba(255,255,255,0.06)] data-[state=active]:text-[#F5F0E8]"
               >
                 {tab.icon}
                 {tab.label}
@@ -271,13 +271,13 @@ export default function FeatureTabs() {
                   <Badge variant="outline" className="w-fit">
                     {tab.badge}
                   </Badge>
-                  <h3 className="text-xl font-semibold text-white lg:text-2xl">
+                  <h3 className="text-xl font-semibold text-[#F5F0E8] lg:text-2xl">
                     {tab.title}
                   </h3>
                   <p className="text-sm text-[#94a3b8]">{tab.description}</p>
                   <Link
                     href="/projects"
-                    className="mt-1 w-fit rounded-md bg-white px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+                    className="mt-1 w-fit rounded-md bg-[#F5F0E8] px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-[#F5F0E8]/90"
                   >
                     {tab.buttonText}
                   </Link>

@@ -28,7 +28,7 @@ export function ComponentsTab({ components }: { components: ComponentVM[] }) {
         <tbody className="divide-y divide-[rgba(255,255,255,0.06)]">
           {components.map((c) => (
             <tr key={c.id} className="transition hover:bg-[rgba(255,255,255,0.03)]">
-              <td className="px-4 py-2.5 font-mono font-medium text-white">
+              <td className="px-4 py-2.5 font-mono font-medium text-[#F5F0E8]">
                 {c.refDes}
               </td>
               <td className="px-4 py-2.5 text-[#94a3b8]">{c.name ?? "—"}</td>

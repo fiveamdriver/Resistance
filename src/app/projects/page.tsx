@@ -11,10 +11,10 @@ export default async function ProjectsPage() {
     <div className="mx-auto max-w-6xl px-6 py-8 pt-24">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-white">Projects</h1>
+          <h1 className="text-2xl font-bold text-[#F5F0E8]">Projects</h1>
           <Link
             href="/projects/new"
-            className="rounded-md bg-white px-4 py-2 text-sm font-semibold text-black transition-all hover:bg-white/90"
+            className="rounded-md bg-[#F5F0E8] px-4 py-2 text-sm font-semibold text-black transition-all hover:bg-[#F5F0E8]/90"
           >
             + New Project
           </Link>
@@ -25,7 +25,7 @@ export default async function ProjectsPage() {
             <p className="text-[#94a3b8]">No projects yet.</p>
             <Link
               href="/projects/new"
-              className="mt-3 inline-block rounded-md bg-white px-4 py-2 text-sm font-semibold text-black transition-all hover:bg-white/90"
+              className="mt-3 inline-block rounded-md bg-[#F5F0E8] px-4 py-2 text-sm font-semibold text-black transition-all hover:bg-[#F5F0E8]/90"
             >
               Create your first project
             </Link>
@@ -38,7 +38,7 @@ export default async function ProjectsPage() {
                   href={`/projects/${p.id}`}
                   className="block rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5 transition hover:border-[rgba(255,255,255,0.25)] hover:bg-[rgba(255,255,255,0.05)]"
                 >
-                  <h2 className="font-semibold text-white">{p.name}</h2>
+                  <h2 className="font-semibold text-[#F5F0E8]">{p.name}</h2>
                   {p.description && (
                     <p className="mt-1 line-clamp-2 text-sm text-[#94a3b8]">
                       {p.description}

@@ -17,27 +17,25 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,301,400,401,500,501,700,701,900,901&display=swap" rel="stylesheet" />
+      </head>
       <body className="min-h-screen bg-[#050505]">
-        <header className="sticky top-0 z-50 border-b border-[#0f1f0f] bg-[#050505]/95 backdrop-blur-sm">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="text-lg font-bold text-white">
-                ⚡ Resistance
-              </span>
-              <span className="hidden text-xs text-[#4a5568] sm:inline">
-                EE Project Assistant
-              </span>
+        <header className="sticky top-0 z-50">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
+            <Link href="/" className="text-[32px] font-bold tracking-tight text-[#F5F0E8]">
+              Resistance
             </Link>
-            <nav className="flex items-center gap-4 text-sm">
+            <nav className="flex items-center gap-6 text-sm">
               <Link
                 href="/projects"
-                className="text-[#94a3b8] transition-colors hover:text-white"
+                className="text-[#4a5568] transition-colors hover:text-[#94a3b8]"
               >
                 Projects
               </Link>
               <Link
                 href="/projects/new"
-                className="rounded-md bg-white px-3 py-1.5 font-semibold text-black transition-colors hover:bg-white/90"
+                className="rounded border border-[rgba(255,255,255,0.15)] px-4 py-1.5 text-[#94a3b8] transition-colors hover:border-[rgba(255,255,255,0.3)] hover:text-[#F5F0E8]"
               >
                 New Project
               </Link>

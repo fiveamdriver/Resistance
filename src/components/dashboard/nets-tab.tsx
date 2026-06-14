@@ -24,7 +24,7 @@ export function NetsTab({ nets }: { nets: NetVM[] }) {
         <tbody className="divide-y divide-[rgba(255,255,255,0.06)]">
           {nets.map((net) => (
             <tr key={net.id} className="transition hover:bg-[rgba(255,255,255,0.03)]">
-              <td className="px-4 py-2.5 font-mono font-medium text-white">
+              <td className="px-4 py-2.5 font-mono font-medium text-[#F5F0E8]">
                 {net.name}
               </td>
               <td className="px-4 py-2.5 text-[#94a3b8]">

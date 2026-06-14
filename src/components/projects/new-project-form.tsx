@@ -16,7 +16,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-md bg-white px-5 py-2.5 font-semibold text-black transition-all hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
+      className="rounded-md bg-[#F5F0E8] px-5 py-2.5 font-semibold text-black transition-all hover:bg-[#F5F0E8]/90 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {pending ? "Creating…" : "Create project"}
     </button>
@@ -48,7 +48,7 @@ export function NewProjectForm() {
           required
           maxLength={120}
           placeholder="e.g. Power Board Rev B"
-          className="w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-white placeholder:text-[#2a2a35] outline-none transition focus:border-[rgba(255,255,255,0.3)] focus:ring-1 focus:ring-[rgba(255,255,255,0.1)]"
+          className="w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-[#F5F0E8] placeholder:text-[#2a2a35] outline-none transition focus:border-[rgba(255,255,255,0.3)] focus:ring-1 focus:ring-[rgba(255,255,255,0.1)]"
         />
         {state.fieldErrors?.name?.map((msg) => (
           <p key={msg} className="text-xs text-red-400">
@@ -68,7 +68,7 @@ export function NewProjectForm() {
           rows={3}
           maxLength={2000}
           placeholder="Short description of the board / system"
-          className="w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-white placeholder:text-[#2a2a35] outline-none transition focus:border-[rgba(255,255,255,0.3)] focus:ring-1 focus:ring-[rgba(255,255,255,0.1)]"
+          className="w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-[#F5F0E8] placeholder:text-[#2a2a35] outline-none transition focus:border-[rgba(255,255,255,0.3)] focus:ring-1 focus:ring-[rgba(255,255,255,0.1)]"
         />
         {state.fieldErrors?.description?.map((msg) => (
           <p key={msg} className="text-xs text-red-400">

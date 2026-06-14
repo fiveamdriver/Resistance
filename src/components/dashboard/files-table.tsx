@@ -29,7 +29,7 @@ export function FilesTable({ files }: { files: FileVM[] }) {
         <tbody className="divide-y divide-[rgba(255,255,255,0.05)]">
           {files.map((file) => (
             <tr key={file.id} className="transition hover:bg-[rgba(255,255,255,0.03)]">
-              <td className="px-4 py-2.5 font-medium text-white">
+              <td className="px-4 py-2.5 font-medium text-[#F5F0E8]">
                 {file.originalName}
               </td>
               <td className="px-4 py-2.5 capitalize text-[#94a3b8]">

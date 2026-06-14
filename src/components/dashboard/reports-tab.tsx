@@ -17,7 +17,7 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
             key={s.label}
             className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4 text-center"
           >
-            <div className="text-2xl font-bold text-white">{s.value}</div>
+            <div className="text-2xl font-bold text-[#F5F0E8]">{s.value}</div>
             <div className="text-xs uppercase tracking-wide text-[#4a5568]">
               {s.label}
             </div>

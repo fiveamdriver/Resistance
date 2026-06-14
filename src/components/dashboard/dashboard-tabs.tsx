@@ -37,7 +37,7 @@ export function DashboardTabs({ vm }: { vm: DashboardVM }) {
             className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               active === tab
                 ? "border-brand text-brand"
-                : "border-transparent text-[#4a5568] hover:text-white"
+                : "border-transparent text-[#4a5568] hover:text-[#F5F0E8]"
             }`}
           >
             {tab}
