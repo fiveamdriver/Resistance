@@ -25,6 +25,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
     "@paper-design/shaders-react": "^0.0.76",
     "@prisma/client": "^6.2.1",
     "@radix-ui/react-slot": "^1.2.5",

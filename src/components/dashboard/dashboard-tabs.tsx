@@ -60,7 +60,7 @@ export function DashboardTabs({ vm }: { vm: DashboardVM }) {
           <ConnectivityTab graph={vm.graph} />
         )}
         {active === "BOM" && <BomTab bomItems={vm.bomItems} />}
-        {active === "AI Assistant" && <AiAssistant />}
+        {active === "AI Assistant" && <AiAssistant projectId={vm.project.id} />}
         {active === "Reports" && <ReportsTab vm={vm} />}
       </div>
     </div>
