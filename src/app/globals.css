@@ -9,11 +9,13 @@
 
 body {
   background: var(--background);
+  background-color: #050505;
   color: var(--foreground);
   font-family: 'Satoshi', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
 html {
+  background-color: #050505;
   scroll-behavior: smooth;
   scroll-snap-type: y mandatory;
   overflow-y: scroll;
