@@ -49,8 +49,14 @@ export function FileUpload({ projectId }: { projectId: string }) {
       >
         <div
           onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node))
+              setDragging(false);
+          }}
           onDrop={(e) => {
             e.preventDefault();
             setDragging(false);
@@ -70,13 +76,23 @@ export function FileUpload({ projectId }: { projectId: string }) {
           <Upload className="h-4 w-4 shrink-0 text-[#4a5568]" />
           <div className="min-w-0 flex-1">
             <p className="text-sm text-[#94a3b8]">
-              {fileCount > 0
-                ? <><span className="font-medium text-[#F5F0E8]">{fileCount} file{fileCount > 1 ? "s" : ""} selected</span> — click to change</>
-                : <>Drop files or <span className="font-medium text-[#F5F0E8]">browse</span></>
-              }
+              {fileCount > 0 ? (
+                <>
+                  <span className="font-medium text-[#F5F0E8]">
+                    {fileCount} file{fileCount > 1 ? "s" : ""} selected
+                  </span>{" "}
+                  — click to change
+                </>
+              ) : (
+                <>
+                  Drop files or{" "}
+                  <span className="font-medium text-[#F5F0E8]">browse</span>
+                </>
+              )}
             </p>
             <p className="text-xs text-[#4a5568]">
-              .net · .txt · .csv · .xlsx · .pdf · .md · .docx · max 25 MB
+              .net · .csv · .xlsx · .pdf · .schdoc · .pcbdoc · .md · .txt ·
+              .docx · max 50 MB
             </p>
           </div>
           <UploadButton />

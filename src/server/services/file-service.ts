@@ -9,6 +9,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/errors";
 import { categorizeFile } from "@/lib/fileTypes";
+import { assertAltiumBinary } from "@/lib/parsers/altiumParser";
 import { parseBomFile } from "@/lib/parsers/bomParser";
 import { parseNetlistFile } from "@/lib/parsers/netlistParser";
 import { saveUploadedFile } from "@/lib/storage";
@@ -82,7 +83,7 @@ export async function uploadFiles(
 
     outcomes.push({ fileName: file.name, ok: true });
 
-    // ── Step 2: parse (netlist / BOM only) ────────────────────────────────
+    // ── Step 2: parse / validate by category ──────────────────────────────
     // Failures update parseStatus in the DB but don't fail the upload outcome;
     // the parse status badge in the files table communicates the result.
     if (category === "netlist" || category === "bom") {
@@ -103,6 +104,22 @@ export async function uploadFiles(
             parseStatus: "failed",
             parseError:
               err instanceof Error ? err.message : "Unexpected parse error",
+          },
+        });
+      }
+    } else if (category === "altium") {
+      // Altium .SchDoc/.PcbDoc are imported and stored; we validate that the
+      // upload is a genuine Altium binary but do not extract connectivity yet
+      // (see altiumParser). Valid files remain "pending"; invalid ones fail.
+      try {
+        await assertAltiumBinary(absolutePath);
+      } catch (err) {
+        await prisma.projectFile.update({
+          where: { id: projectFileId },
+          data: {
+            parseStatus: "failed",
+            parseError:
+              err instanceof Error ? err.message : "Invalid Altium file",
           },
         });
       }

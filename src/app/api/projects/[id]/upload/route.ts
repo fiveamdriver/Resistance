@@ -16,6 +16,7 @@
  */
 import { NextResponse } from "next/server";
 
+import { assertAltiumBinary } from "@/lib/parsers/altiumParser";
 import { parseBomFile } from "@/lib/parsers/bomParser";
 import { parseNetlistFile } from "@/lib/parsers/netlistParser";
 import { prisma } from "@/lib/prisma";
@@ -107,7 +108,7 @@ export async function POST(
 
   // ── 6. Parse ──────────────────────────────────────────────────────────────
   let summary: ParseSummary;
-  let parseStatus: "parsed" | "failed" = "parsed";
+  let parseStatus: "pending" | "parsed" | "failed" = "parsed";
   let parseError: string | null = null;
 
   try {
@@ -115,6 +116,15 @@ export async function POST(
       summary = await parseNetlistFile(projectId, stored.absolutePath);
     } else if (category === "bom") {
       summary = await parseBomFile(projectId, stored.absolutePath);
+    } else if (category === "altium") {
+      // Validate the upload is a genuine Altium binary, then leave it "pending":
+      // imported and stored, with connectivity extraction deferred.
+      await assertAltiumBinary(stored.absolutePath);
+      parseStatus = "pending";
+      summary = {
+        message:
+          "Altium document imported and stored. Connectivity extraction from the binary is not implemented yet — export a netlist (.net) for nets/components.",
+      };
     } else {
       summary = {
         message: `File stored as category "${category}". No parser implemented for this type yet.`,
@@ -139,7 +149,7 @@ export async function POST(
 
   return NextResponse.json(
     {
-      success: parseStatus === "parsed",
+      success: parseStatus !== "failed",
       projectFileId: projectFile.id,
       summary,
     },

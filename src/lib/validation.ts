@@ -8,8 +8,9 @@ import { z } from "zod";
 import { ValidationError } from "./errors";
 import { isAcceptedFile } from "./fileTypes";
 
-/** Maximum upload size per file (25 MB) — mirrors next.config server action limit. */
-export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+/** Maximum upload size per file (50 MB) — mirrors next.config server action limit.
+ *  Altium .PcbDoc files in particular can run large. */
+export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 export const createProjectSchema = z.object({
   name: z
@@ -42,7 +43,7 @@ export const uploadFileMetaSchema = z.object({
     .number()
     .int()
     .positive("File is empty")
-    .max(MAX_UPLOAD_BYTES, "File exceeds the 25 MB limit"),
+    .max(MAX_UPLOAD_BYTES, "File exceeds the 50 MB limit"),
 });
 
 /**

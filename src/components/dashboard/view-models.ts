@@ -4,6 +4,7 @@
  * surprises) makes the client/server boundary explicit and the components easy
  * to test and reason about.
  */
+import type { Severity } from "@/lib/review-types";
 import type { ConnectivityGraph } from "@/types/connectivity";
 
 export interface FileVM {
@@ -43,6 +44,25 @@ export interface BomItemVM {
   componentRefs: string[];
 }
 
+export interface FindingVM {
+  id: string;
+  block: string;
+  severity: Severity;
+  title: string;
+  rationale: string;
+  refDes: string[];
+  hwReviewRequired: boolean;
+}
+
+export interface ReviewRunVM {
+  id: string;
+  status: string;
+  model: string;
+  summary: string | null;
+  createdAt: string; // ISO string
+  findings: FindingVM[];
+}
+
 export interface DashboardVM {
   project: { id: string; name: string; description: string | null };
   files: FileVM[];
@@ -51,4 +71,6 @@ export interface DashboardVM {
   bomItems: BomItemVM[];
   graph: ConnectivityGraph;
   documentChunkCount: number;
+  /** Most recent design-review run, or null if none has been run yet. */
+  latestReview: ReviewRunVM | null;
 }

@@ -2,9 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DashboardTabs } from "@/components/dashboard/dashboard-tabs";
-import type { DashboardVM, FileVM } from "@/components/dashboard/view-models";
+import type {
+  DashboardVM,
+  FileVM,
+  ReviewRunVM,
+} from "@/components/dashboard/view-models";
 import { NotFoundError } from "@/lib/errors";
 import type { ParseStatus } from "@/lib/fileTypes";
+import { isSeverity } from "@/lib/review-types";
 import { getConnectivityGraph } from "@/server/services/connectivity-service";
 import {
   getProjectDashboard,
@@ -27,6 +32,32 @@ function toViewModel(
     sizeBytes: f.sizeBytes,
     uploadedAt: f.uploadedAt.toISOString(),
   }));
+
+  const run = project.reviewRuns[0];
+  const latestReview: ReviewRunVM | null = run
+    ? {
+        id: run.id,
+        status: run.status,
+        model: run.model,
+        summary: run.summary,
+        createdAt: run.createdAt.toISOString(),
+        findings: run.findings.map((f) => ({
+          id: f.id,
+          block: f.block,
+          // Stored as a validated string; fall back to "verify" if ever unexpected.
+          severity: isSeverity(f.severity) ? f.severity : "verify",
+          title: f.title,
+          rationale: f.rationale,
+          refDes: f.refDes
+            ? f.refDes
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+            : [],
+          hwReviewRequired: f.hwReviewRequired,
+        })),
+      }
+    : null;
 
   return {
     project: {
@@ -61,6 +92,7 @@ function toViewModel(
     })),
     graph,
     documentChunkCount: project._count.documentChunks,
+    latestReview,
   };
 }
 

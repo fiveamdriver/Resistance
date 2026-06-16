@@ -47,6 +47,12 @@ export async function getProjectDashboard(projectId: string) {
         orderBy: { refDesRaw: "asc" },
         include: { components: true },
       },
+      // Only the most recent review run is needed for the Reports tab.
+      reviewRuns: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        include: { findings: true },
+      },
       _count: { select: { documentChunks: true } },
     },
   });

@@ -54,6 +54,7 @@ model Project {
   nets           Net[]
   bomItems       BomItem[]
   documentChunks DocumentChunk[]
+  reviewRuns     ReviewRun[]
 
   @@index([ownerId])
 }
@@ -175,4 +176,41 @@ model DocumentChunk {
 
   @@index([projectId])
   @@index([fileId])
+}
+
+/// One execution of the AI design-review pipeline over a project's parsed data.
+/// Findings are persisted so past reviews remain viewable (and, later, resumable).
+model ReviewRun {
+  id        String   @id @default(cuid())
+  projectId String
+  // Lifecycle: "completed" | "failed"
+  status    String   @default("completed")
+  model     String // LLM model id used, e.g. "claude-sonnet-4-6"
+  summary   String? // short natural-language overview produced by the reviewer
+  error     String? // populated when status = "failed"
+  createdAt DateTime @default(now())
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  findings Finding[]
+
+  @@index([projectId])
+}
+
+/// A single design-review finding. Mirrors the action-item format: what to look
+/// at, why it's flagged, severity, and whether a human HW review is required.
+model Finding {
+  id          String  @id @default(cuid())
+  reviewRunId String
+  block       String // functional block, e.g. "LO Synthesizer", "LNA Chain"
+  // Severity: "possible_bug" | "verify" | "watch" | "minor" | "cosmetic" | "ok"
+  severity    String
+  title       String // short "what to look at"
+  rationale   String // "why it's flagged" — quantitative where possible
+  refDes      String // comma-separated refdes list, e.g. "U7, R12" (SQLite has no arrays)
+  // true = needs a human hardware review (the doc's "yellow"); false = informational.
+  hwReviewRequired Boolean @default(false)
+
+  reviewRun ReviewRun @relation(fields: [reviewRunId], references: [id], onDelete: Cascade)
+
+  @@index([reviewRunId])
 }

@@ -5,7 +5,13 @@
  * data model Postgres-portable without enum migrations.
  */
 
-export type FileCategory = "netlist" | "bom" | "pdf" | "document" | "other";
+export type FileCategory =
+  | "netlist"
+  | "bom"
+  | "pdf"
+  | "document"
+  | "altium"
+  | "other";
 
 export type ParseStatus = "pending" | "parsed" | "failed";
 
@@ -22,6 +28,9 @@ export const ACCEPTED_EXTENSIONS: Record<
   pdf: [".pdf"],
   // General docs (.txt can be a netlist OR a doc — see categorizeFile)
   document: [".md", ".txt", ".docx"],
+  // Altium native binary documents (schematic / PCB) — imported & stored;
+  // connectivity extraction from the binary is future work (see altiumParser).
+  altium: [".schdoc", ".pcbdoc"],
 };
 
 /** Flat list for the file input `accept` attribute. */
@@ -33,6 +42,8 @@ export const ACCEPT_ATTR = [
   ".pdf",
   ".md",
   ".docx",
+  ".schdoc",
+  ".pcbdoc",
 ].join(",");
 
 /** Extract a lowercased extension (incl. leading dot) from a filename. */
