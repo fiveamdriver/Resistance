@@ -18,13 +18,21 @@ import {
 export async function getConnectivityGraph(
   projectId: string
 ): Promise<ConnectivityGraph> {
-  const connections = await prisma.connection.findMany({
-    where: { net: { projectId } },
-    include: {
-      net: true,
-      pin: { include: { component: true } },
-    },
-  });
+  const [connections, components] = await Promise.all([
+    prisma.connection.findMany({
+      where: { net: { projectId } },
+      include: {
+        net: true,
+        pin: { include: { component: true } },
+      },
+    }),
+    // Component metadata (value/comment/footprint) so the graph can label parts
+    // and detect 0Ω jumpers — connection rows alone don't carry it.
+    prisma.component.findMany({
+      where: { projectId },
+      select: { refDes: true, name: true, value: true, footprint: true },
+    }),
+  ]);
 
   const pinConnections: PinConnection[] = connections.map((c) => ({
     componentRefDes: c.pin.component.refDes,
@@ -33,5 +41,5 @@ export async function getConnectivityGraph(
     netName: c.net.name,
   }));
 
-  return buildGraph(pinConnections);
+  return buildGraph(pinConnections, components);
 }

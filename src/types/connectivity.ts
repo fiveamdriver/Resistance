@@ -78,8 +78,22 @@ export function componentsForNet(
   );
 }
 
-/** Build a ConnectivityGraph from a flat list of pin connections. */
-export function buildGraph(connections: PinConnection[]): ConnectivityGraph {
+/** Optional per-component metadata merged into the graph (name/value/footprint).
+ *  In Altium Protel netlists the component "comment" (value, e.g. "10k", "0R")
+ *  arrives as `name`; carrying it lets the UI label parts and detect 0Ω jumpers. */
+export interface ComponentMeta {
+  refDes: string;
+  name?: string | null;
+  value?: string | null;
+  footprint?: string | null;
+}
+
+/** Build a ConnectivityGraph from pin connections, optionally enriched with
+ *  per-component metadata. */
+export function buildGraph(
+  connections: PinConnection[],
+  components?: ComponentMeta[]
+): ConnectivityGraph {
   const componentMap = new Map<string, ComponentNode>();
   const netMap = new Map<string, NetNode>();
 
@@ -100,6 +114,17 @@ export function buildGraph(connections: PinConnection[]): ConnectivityGraph {
     };
     net.pinCount += 1;
     netMap.set(c.netName, net);
+  }
+
+  // Merge metadata onto the component nodes that actually appear in the graph.
+  if (components) {
+    for (const meta of components) {
+      const node = componentMap.get(meta.refDes);
+      if (!node) continue;
+      if (meta.name != null) node.name = meta.name;
+      if (meta.value != null) node.value = meta.value;
+      if (meta.footprint != null) node.footprint = meta.footprint;
+    }
   }
 
   return {
