@@ -52,7 +52,7 @@ export default function HomePage() {
             </div>
 
             {/* Right: live connectivity graph — frameless ──────────────────── */}
-            <div className="relative h-[min(665px,60vh)] w-[calc(100%+8rem)] -ml-52 mt-16 overflow-hidden">
+            <div className="relative h-[min(665px,60vh)] w-[calc(100%+8rem)] -ml-52 mt-20 overflow-hidden">
               <ConnectivityHeroGraph />
             </div>
 
