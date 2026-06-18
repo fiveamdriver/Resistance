@@ -10,7 +10,7 @@ export default function HomePage() {
 
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
         <section className="relative flex min-h-screen items-start [scroll-snap-align:start] [scroll-snap-stop:always]">
-          <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-16 px-6 pt-20 pb-4 lg:grid-cols-[auto_1fr] lg:items-start lg:gap-12">
+          <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-16 px-6 pt-32 pb-4 lg:grid-cols-[auto_1fr] lg:items-start lg:gap-12">
 
             {/* Left: copy ─────────────────────────────────────────────────── */}
             <div>
@@ -52,7 +52,7 @@ export default function HomePage() {
             </div>
 
             {/* Right: live connectivity graph — frameless ──────────────────── */}
-            <div className="relative h-[665px] w-[calc(100%+8rem)] -ml-44 mt-4">
+            <div className="relative h-[min(665px,60vh)] w-[calc(100%+8rem)] -ml-52 mt-16 overflow-hidden">
               <ConnectivityHeroGraph />
             </div>
 
@@ -63,7 +63,7 @@ export default function HomePage() {
         </section>
 
         {/* ── Features ─────────────────────────────────────────────────────── */}
-        <div className="relative h-screen pt-4 [scroll-snap-align:start] [scroll-snap-stop:always]">
+        <div className="relative h-screen pt-16 [scroll-snap-align:start] [scroll-snap-stop:always]">
           <div className="max-h-screen overflow-y-auto">
             <FeatureTabs />
           </div>
