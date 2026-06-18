@@ -47,28 +47,28 @@ function KBVisual() {
 
 function ConnectivityVisual() {
   const nodes = [
-    { x: 50,  y: 45,  label: "R12", sub: "SPI_CLK" },
-    { x: 230, y: 45,  label: "U3",  sub: "SCK" },
-    { x: 45,  y: 145, label: "C45", sub: "+3V3" },
-    { x: 230, y: 145, label: "TP7", sub: "nRST" },
-    { x: 140, y: 15,  label: "+5V", sub: "PWR" },
+    { x: 50,  y: 50,  label: "R12", sub: "SPI_CLK" },
+    { x: 230, y: 50,  label: "U3",  sub: "SCK" },
+    { x: 45,  y: 130, label: "C45", sub: "+3V3" },
+    { x: 230, y: 130, label: "TP7", sub: "nRST" },
+    { x: 140, y: 25,  label: "+5V", sub: "PWR" },
   ];
   return (
-    <div className="w-full rounded-xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.02)] p-4">
+    <div className="w-full overflow-hidden rounded-xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.02)] p-4">
       <div className="mb-2 font-mono text-[10px] text-[#3f3f4f]">
         Connectivity: U7 → neighbors (5 connections)
       </div>
-      <svg viewBox="0 0 280 185" className="w-full" aria-hidden="true">
+      <svg viewBox="0 0 280 155" className="w-full" aria-hidden="true">
         {nodes.map((n) => (
           <g key={n.label}>
             <line
-              x1={140} y1={95} x2={n.x} y2={n.y}
+              x1={140} y1={88} x2={n.x} y2={n.y}
               stroke="#60a5fa" strokeOpacity={0.18} strokeWidth={0.75}
               strokeDasharray="3 4"
             />
             <text
               x={(140 + n.x) / 2}
-              y={(95 + n.y) / 2 - 4}
+              y={(88 + n.y) / 2 - 4}
               textAnchor="middle"
               fill="rgba(96,165,250,0.2)"
               fontSize={7}
@@ -79,13 +79,13 @@ function ConnectivityVisual() {
           </g>
         ))}
         {/* Center node */}
-        <circle cx={140} cy={95} r={22}
+        <circle cx={140} cy={88} r={22}
           fill="rgba(96,165,250,0.07)"
           stroke="rgba(96,165,250,0.4)"
           strokeWidth={1} />
-        <text x={140} y={92} textAnchor="middle" dominantBaseline="middle"
+        <text x={140} y={85} textAnchor="middle" dominantBaseline="middle"
           fill="#60a5fa" fontSize={11} fontFamily="monospace" fontWeight="bold">U7</text>
-        <text x={140} y={105} textAnchor="middle"
+        <text x={140} y={98} textAnchor="middle"
           fill="#93c5fd" fontSize={8} fontFamily="monospace">MCU</text>
         {/* Satellite nodes */}
         {nodes.map((n) => (
@@ -233,20 +233,20 @@ const TABS = [
 
 export default function FeatureTabs() {
   return (
-    <section className="pt-16 pb-4">
+    <section className="pt-6 pb-4">
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex flex-col items-center gap-2 text-center">
           <Badge variant="outline">Engineering Intelligence</Badge>
-          <h2 className="max-w-2xl text-2xl font-semibold text-[#F5F0E8] md:text-3xl">
+          <h2 className="max-w-2xl text-xl font-semibold text-[#F5F0E8] md:text-2xl">
             Know your design. Navigate it.
           </h2>
-          <p className="max-w-xl text-sm text-[#94a3b8]">
+          <p className="max-w-xl text-xs text-[#94a3b8]">
             Purpose-built tools for electrical engineers working with complex PCB
             projects — from first schematic capture to design review.
           </p>
         </div>
 
-        <Tabs.Root defaultValue="knowledge" className="mt-4">
+        <Tabs.Root defaultValue="knowledge" className="mt-3">
           <Tabs.List className="flex flex-wrap items-center justify-center gap-2">
             {TABS.map((tab) => (
               <Tabs.Trigger
@@ -260,24 +260,24 @@ export default function FeatureTabs() {
             ))}
           </Tabs.List>
 
-          <div className="mx-auto mt-4 max-w-5xl rounded-2xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.02)] p-4 lg:p-6">
+          <div className="mx-auto mt-4 max-w-5xl rounded-2xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.02)] p-3 lg:p-4">
             {TABS.map((tab) => (
               <Tabs.Content
                 key={tab.value}
                 value={tab.value}
-                className="grid place-items-center gap-6 outline-none lg:grid-cols-2 lg:gap-8"
+                className="grid place-items-center gap-4 outline-none lg:grid-cols-2 lg:gap-6"
               >
                 <div className="flex flex-col gap-3">
                   <Badge variant="outline" className="w-fit">
                     {tab.badge}
                   </Badge>
-                  <h3 className="text-xl font-semibold text-[#F5F0E8] lg:text-2xl">
+                  <h3 className="text-base font-semibold text-[#F5F0E8] lg:text-lg">
                     {tab.title}
                   </h3>
-                  <p className="text-sm text-[#94a3b8]">{tab.description}</p>
+                  <p className="text-xs text-[#94a3b8]">{tab.description}</p>
                   <Link
                     href="/projects"
-                    className="mt-1 w-fit rounded-md bg-[#F5F0E8] px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-[#F5F0E8]/90"
+                    className="mt-1 w-fit rounded-md bg-[#F5F0E8] px-4 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-[#F5F0E8]/90"
                   >
                     {tab.buttonText}
                   </Link>

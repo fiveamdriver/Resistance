@@ -123,11 +123,22 @@ const EDGES: Edge[] = [
 
 export default function ConnectivityHeroGraph() {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const [isXl, setIsXl] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const mq = window.matchMedia("(min-width: 1280px)");
+    setIsXl(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsXl(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   if (!mounted) return null;
 
   return (
     <ReactFlow
+      key={isXl ? "xl" : "lg"}
       nodes={NODES}
       edges={EDGES}
       nodeTypes={nodeTypes}
