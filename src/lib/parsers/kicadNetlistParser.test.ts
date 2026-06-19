@@ -37,16 +37,19 @@ describe("parseKicadNetlistText", () => {
       refDes: "U1",
       name: "STM32F446RET6",
       footprint: "Package_QFP:LQFP-64_10x10mm_P0.5mm",
+      mpn: null,
     });
     expect(components[1]).toEqual({
       refDes: "R1",
       name: "10k",
       footprint: "Resistor_SMD:R_0402_1005Metric",
+      mpn: null,
     });
     expect(components[2]).toEqual({
       refDes: "C1",
       name: "100nF",
       footprint: "Capacitor_SMD:C_0402_1005Metric",
+      mpn: null,
     });
   });
 
@@ -103,6 +106,24 @@ describe("parseKicadNetlistText", () => {
     );
     expect(components).toHaveLength(0);
     expect(nets).toHaveLength(0);
+  });
+
+  it("extracts MPN from (property (name MPN#) (value ...)) blocks", () => {
+    const withMpn = `(export (version "E")
+  (components
+    (comp (ref "U1")
+      (value "TPS54331DR")
+      (footprint "SOIC-8")
+      (property (name "MPN#") (value "TPS54331DR"))
+      (property (name "Datasheet") (value "https://www.ti.com/lit/ds/symlink/tps54331.pdf")))
+    (comp (ref "R1")
+      (value "10k")
+      (footprint "R_0402")))
+  (nets))`;
+    const { components } = parseKicadNetlistText(withMpn);
+    expect(components).toHaveLength(2);
+    expect(components[0].mpn).toBe("TPS54331DR");
+    expect(components[1].mpn).toBeNull();
   });
 
   it("does not confuse (comp ...) with (components ...) or (net ...) with (nets ...)", () => {

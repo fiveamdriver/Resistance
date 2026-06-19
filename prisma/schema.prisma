@@ -89,6 +89,7 @@ model Component {
   description String?
   value       String? // e.g. "10k", "100nF"
   footprint   String?
+  mpn         String? // manufacturer part number; populated from KiCad fields or BOM
 
   project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   pins     Pin[]
@@ -96,6 +97,7 @@ model Component {
 
   @@unique([projectId, refDes])
   @@index([projectId])
+  @@index([mpn])
 }
 
 /// An electrical net (signal). Name e.g. "5V", "GND", "SPI_CLK".
@@ -194,6 +196,23 @@ model ReviewRun {
   findings Finding[]
 
   @@index([projectId])
+}
+
+/// Global per-MPN datasheet cache. Keyed by MPN only — shared across all projects
+/// so the same part is never fetched or re-parsed twice.
+model MpnCache {
+  id           String    @id @default(cuid())
+  mpn          String    @unique
+  // Lifecycle: "pending" | "complete" | "missing_datasheet" | "error"
+  status       String    @default("pending")
+  datasheetUrl String?
+  // JSON string: { maxVoltageV, maxCurrentA, tempRangeMinC, tempRangeMaxC, componentType, notes }
+  specs        String?
+  error        String?
+  fetchedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([mpn])
 }
 
 /// A single design-review finding. Mirrors the action-item format: what to look

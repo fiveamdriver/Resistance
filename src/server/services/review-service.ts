@@ -28,6 +28,7 @@ import {
 import type { ReviewResult } from "@/lib/review-types";
 
 import { assertProjectExists } from "./project-service";
+import { enrichProjectMpns } from "./datasheet-service";
 
 const DEFAULT_MODEL = "claude-sonnet-4-6";
 const MAX_ROUNDS = 10;
@@ -47,16 +48,25 @@ AC-coupled single-ended, bias networks, filters) and VERIFY passive values using
 calc tools: AC-coupling cap reactance at the signal frequency, termination parallel \
 impedance vs the line impedance (assume 50Ω unless data says otherwise), divider/bias \
 set-points. Always parse_value before a reactance calc; never do unit math yourself.
-4. Check common issues: missing decoupling/bypass on supply pins, unconnected/floating \
+4. For ICs, regulators, MOSFETs, capacitors, and diodes: call get_component_specs(refdes) \
+to retrieve datasheet-sourced ratings. When specs are available, perform compliance checks:
+   - Voltage derating: flag if a net voltage exceeds 80% of the component's maxVoltageV \
+(possible_bug if quantitative evidence; verify if net voltage is inferred).
+   - Current derating: flag if estimated current exceeds 80% of maxCurrentA.
+   - Temperature: flag if the board's operating range falls outside the component's \
+tempRangeMinC–tempRangeMaxC.
+   When get_component_specs returns { available: false }, fall back to marking the finding \
+"verify" and noting that datasheet confirmation is needed.
+5. Check common issues: missing decoupling/bypass on supply pins, unconnected/floating \
 pins, single-point-of-failure parts, BOM/netlist mismatches.
 
 GROUNDING RULES — no exceptions:
 - Every board fact (refdes, net, value) must come from a tool result, cited verbatim.
 - An empty/absent result means "not in the parsed data," NOT "absent on the board." \
 Flag such cases as severity "verify", never "possible_bug".
-- If you rely on knowledge of a part NOT present in the data (e.g. a datasheet rating), \
-mark the finding "verify" and say it needs datasheet/human confirmation. Do not assert \
-unverified specs as fact.
+- Datasheet specs from get_component_specs are sourced from web search and may contain \
+errors — always cite the spec value and flag high-stakes findings (possible_bug) for \
+human hardware review (set hwReviewRequired: true).
 - If an operating frequency is needed but not determinable from the data, state the \
 assumption you used (or mark "verify").
 
@@ -86,6 +96,13 @@ export async function runReview(
       "AI review is not configured: set ANTHROPIC_API_KEY in your environment."
     );
   }
+
+  // Pre-fetch datasheets for all MPNs in the project so get_component_specs
+  // has data to return. Skips already-cached entries (< 1ms each). Errors
+  // inside enrichProjectMpns are swallowed per-MPN — the review proceeds with
+  // whatever specs are available, falling back to "verify" severity for parts
+  // whose datasheets could not be fetched.
+  await enrichProjectMpns(projectId).catch(() => {});
 
   const model = options.model || DEFAULT_MODEL;
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });

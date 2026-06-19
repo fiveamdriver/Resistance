@@ -18,6 +18,8 @@ import {
   searchBom,
   tracePin,
 } from "@/lib/board-queries";
+import { getCachedSpecs } from "@/server/services/datasheet-service";
+import { prisma } from "@/lib/prisma";
 
 // ── tool definitions ──────────────────────────────────────────────────────────
 
@@ -113,6 +115,21 @@ export const boardTools: Anthropic.Messages.Tool[] = [
       },
     },
   },
+  {
+    name: "get_component_specs",
+    description:
+      "Return cached datasheet specs for a component's MPN: absolute max voltage (V), max current (A), operating temperature range (°C), component type, and derating notes. Returns { available: false } if no MPN is known for this component or the datasheet has not been fetched yet. Use this to ground voltage-derating, current-rating, and thermal compliance findings.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        refdes: {
+          type: "string",
+          description: "Reference designator of the component, e.g. 'U1', 'C5'.",
+        },
+      },
+      required: ["refdes"],
+    },
+  },
 ];
 
 // ── executor ──────────────────────────────────────────────────────────────────
@@ -191,6 +208,25 @@ export async function executeBoardTool(
           : undefined;
       const rows = await searchBom(projectId, filter);
       return { rows, count: rows.length };
+    }
+
+    case "get_component_specs": {
+      const refdes = input.refdes;
+      if (typeof refdes !== "string" || !refdes.trim()) {
+        return { error: "refdes is required" };
+      }
+      const comp = await prisma.component.findUnique({
+        where: { projectId_refDes: { projectId, refDes: refdes.trim() } },
+        select: { mpn: true },
+      });
+      if (!comp?.mpn) {
+        return { available: false, reason: "No MPN recorded for this component" };
+      }
+      const cached = await getCachedSpecs(comp.mpn);
+      if (!cached) {
+        return { available: false, reason: "Datasheet not yet fetched for MPN " + comp.mpn };
+      }
+      return { available: true, mpn: comp.mpn, ...cached };
     }
 
     default:

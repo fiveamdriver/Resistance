@@ -38,6 +38,7 @@ export interface ComponentRecord {
   refDes: string;
   footprint: string | null;
   name: string | null;
+  mpn: string | null;
 }
 
 export interface PinRef {
@@ -83,7 +84,7 @@ function parseText(text: string): ParsedNetlistData {
     const name = lines.length > 2 ? lines.slice(2).join(" ").trim() || null : null;
 
     if (refDes) {
-      components.push({ refDes, footprint, name });
+      components.push({ refDes, footprint, name, mpn: null });
     }
   }
 
@@ -138,12 +139,14 @@ export async function upsertComponents(
       update: {
         ...(comp.name != null ? { name: comp.name } : {}),
         ...(comp.footprint != null ? { footprint: comp.footprint } : {}),
+        ...(comp.mpn != null ? { mpn: comp.mpn } : {}),
       },
       create: {
         projectId,
         refDes: comp.refDes,
         name: comp.name,
         footprint: comp.footprint,
+        mpn: comp.mpn,
       },
     });
   }

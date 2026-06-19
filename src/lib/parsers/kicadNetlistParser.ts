@@ -92,6 +92,20 @@ function extractAttr(block: string, keyword: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// Format detection — exported so file-service can import it and tests can cover it
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if the file header looks like a KiCad S-expression netlist.
+ * Accepts both the classic single-line form `(export (version "E")` and the
+ * KiCad 10+ multi-line form `(export\n\t(version "D")`.
+ * Pass the first 128 bytes of the file (trimmed of leading whitespace/BOM).
+ */
+export function isKicadNetlist(header: string): boolean {
+  return /^\(export\s+\(version/.test(header.trimStart());
+}
+
+// ---------------------------------------------------------------------------
 // Pure text parser (no I/O) — exported for unit testing
 // ---------------------------------------------------------------------------
 
@@ -105,10 +119,23 @@ export function parseKicadNetlistText(text: string): {
   for (const compBlock of extractBlocks(text, "comp")) {
     const refDes = extractAttr(compBlock, "ref");
     if (!refDes) continue;
+
+    // Extract MPN from (property (name "MPN#") (value "...")) blocks.
+    // KiCad 6+ emits these alongside the (fields ...) block; (property ...) uses
+    // the standard (name) / (value) attribute format and is easier to parse.
+    let mpn: string | null = null;
+    for (const propBlock of extractBlocks(compBlock, "property")) {
+      if (extractAttr(propBlock, "name") === "MPN#") {
+        mpn = extractAttr(propBlock, "value");
+        break;
+      }
+    }
+
     components.push({
       refDes,
       name: extractAttr(compBlock, "value"),
       footprint: extractAttr(compBlock, "footprint"),
+      mpn,
     });
   }
 

@@ -225,6 +225,15 @@ async function upsertBomRow(
     });
   }
 
+  // BOM is authoritative for MPN — write it back to each linked Component so
+  // the datasheet enrichment pipeline can find it without a join.
+  if (mpn && componentIds.length > 0) {
+    await prisma.component.updateMany({
+      where: { id: { in: componentIds.map((c) => c.id) } },
+      data: { mpn },
+    });
+  }
+
   return { linkedRefs, unlinkedRefs };
 }
 
