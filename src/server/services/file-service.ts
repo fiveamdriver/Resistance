@@ -11,7 +11,7 @@ import { AppError } from "@/lib/errors";
 import { categorizeFile } from "@/lib/fileTypes";
 import { assertAltiumBinary } from "@/lib/parsers/altiumParser";
 import { parseBomFile } from "@/lib/parsers/bomParser";
-import { parseKicadNetlistFile } from "@/lib/parsers/kicadNetlistParser";
+import { isKicadNetlist, parseKicadNetlistFile } from "@/lib/parsers/kicadNetlistParser";
 import { parseNetlistFile } from "@/lib/parsers/netlistParser";
 import { saveUploadedFile } from "@/lib/storage";
 import { parseOrThrow, uploadFileMetaSchema } from "@/lib/validation";
@@ -102,10 +102,8 @@ export async function uploadFiles(
 
     if (category === "netlist") {
       try {
-        // Detect KiCad S-expression format. KiCad 10+ emits (export\n\t(version ...)
-        // while older versions emit (export (version ...) on one line — accept both.
         const header = (await file.slice(0, 128).text()).trimStart();
-        const result = /^\(export\s+\(version/.test(header)
+        const result = isKicadNetlist(header)
           ? await parseKicadNetlistFile(projectId, absolutePath)
           : await parseNetlistFile(projectId, absolutePath);
         parseStatus = "parsed";
