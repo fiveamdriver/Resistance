@@ -102,9 +102,10 @@ export async function uploadFiles(
 
     if (category === "netlist") {
       try {
-        // Detect format from the first 64 bytes: KiCad starts with "(export (version"
-        const header = (await file.slice(0, 64).text()).trimStart();
-        const result = header.startsWith("(export (version")
+        // Detect KiCad S-expression format. KiCad 10+ emits (export\n\t(version ...)
+        // while older versions emit (export (version ...) on one line — accept both.
+        const header = (await file.slice(0, 128).text()).trimStart();
+        const result = /^\(export\s+\(version/.test(header)
           ? await parseKicadNetlistFile(projectId, absolutePath)
           : await parseNetlistFile(projectId, absolutePath);
         parseStatus = "parsed";
