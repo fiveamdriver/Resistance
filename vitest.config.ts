@@ -9,6 +9,11 @@ export default defineConfig({
   },
   resolve: {
     // Mirror the "@/*" alias from tsconfig so tests import the same way as app code.
-    alias: { "@": resolve(__dirname, "src") },
+    // "server-only" is a Next.js guard that throws in browser contexts; stub it
+    // in the Node test environment so server-side modules can be unit-tested.
+    alias: {
+      "@": resolve(__dirname, "src"),
+      "server-only": resolve(__dirname, "src/__mocks__/server-only.ts"),
+    },
   },
 });

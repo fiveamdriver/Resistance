@@ -11,6 +11,7 @@ import { AppError } from "@/lib/errors";
 import { categorizeFile } from "@/lib/fileTypes";
 import { assertAltiumBinary } from "@/lib/parsers/altiumParser";
 import { parseBomFile } from "@/lib/parsers/bomParser";
+import { parseKicadNetlistFile } from "@/lib/parsers/kicadNetlistParser";
 import { parseNetlistFile } from "@/lib/parsers/netlistParser";
 import { saveUploadedFile } from "@/lib/storage";
 import { parseOrThrow, uploadFileMetaSchema } from "@/lib/validation";
@@ -21,6 +22,16 @@ export interface UploadOutcome {
   fileName: string;
   ok: boolean;
   error?: string;
+  /** true when the failure was an I/O/storage error rather than a validation error. */
+  isStorageError?: boolean;
+  /** Validation error field details (e.g. Zod issues), safe to surface to the user. */
+  details?: Record<string, string[] | undefined>;
+  /** The created ProjectFile record ID. Present when ok === true. */
+  projectFileId?: string;
+  /** Final parse status. Present when ok === true. */
+  parseStatus?: "pending" | "parsed" | "failed";
+  /** The parser's result summary. Present when ok === true and parseStatus === "parsed". */
+  summary?: unknown;
 }
 
 /**
@@ -73,31 +84,57 @@ export async function uploadFiles(
       outcomes.push({
         fileName: file.name,
         ok: false,
+        isStorageError: !(error instanceof AppError),
         error:
           error instanceof AppError
             ? error.message
             : "Upload failed unexpectedly",
+        details: error instanceof AppError ? error.details : undefined,
       });
       continue;
     }
 
-    outcomes.push({ fileName: file.name, ok: true });
-
     // ── Step 2: parse / validate by category ──────────────────────────────
-    // Failures update parseStatus in the DB but don't fail the upload outcome;
-    // the parse status badge in the files table communicates the result.
-    if (category === "netlist" || category === "bom") {
+    // Parse failures update parseStatus in the DB but don't fail the upload
+    // outcome — the parse status badge in the files table shows the result.
+    let parseStatus: "pending" | "parsed" | "failed" = "pending";
+    let summary: unknown;
+
+    if (category === "netlist") {
       try {
-        if (category === "netlist") {
-          await parseNetlistFile(projectId, absolutePath);
-        } else {
-          await parseBomFile(projectId, absolutePath);
-        }
+        // Detect format from the first 64 bytes: KiCad starts with "(export (version"
+        const header = (await file.slice(0, 64).text()).trimStart();
+        const result = header.startsWith("(export (version")
+          ? await parseKicadNetlistFile(projectId, absolutePath)
+          : await parseNetlistFile(projectId, absolutePath);
+        parseStatus = "parsed";
+        summary = result;
         await prisma.projectFile.update({
           where: { id: projectFileId },
           data: { parseStatus: "parsed" },
         });
       } catch (err) {
+        parseStatus = "failed";
+        await prisma.projectFile.update({
+          where: { id: projectFileId },
+          data: {
+            parseStatus: "failed",
+            parseError:
+              err instanceof Error ? err.message : "Unexpected parse error",
+          },
+        });
+      }
+    } else if (category === "bom") {
+      try {
+        const result = await parseBomFile(projectId, absolutePath);
+        parseStatus = "parsed";
+        summary = result;
+        await prisma.projectFile.update({
+          where: { id: projectFileId },
+          data: { parseStatus: "parsed" },
+        });
+      } catch (err) {
+        parseStatus = "failed";
         await prisma.projectFile.update({
           where: { id: projectFileId },
           data: {
@@ -114,6 +151,7 @@ export async function uploadFiles(
       try {
         await assertAltiumBinary(absolutePath);
       } catch (err) {
+        parseStatus = "failed";
         await prisma.projectFile.update({
           where: { id: projectFileId },
           data: {
@@ -124,6 +162,8 @@ export async function uploadFiles(
         });
       }
     }
+
+    outcomes.push({ fileName: file.name, ok: true, projectFileId, parseStatus, summary });
   }
 
   return outcomes;

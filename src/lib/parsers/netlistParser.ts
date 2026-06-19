@@ -34,18 +34,18 @@ export interface NetlistParseSummary {
 // Internal parse types
 // ---------------------------------------------------------------------------
 
-interface ComponentRecord {
+export interface ComponentRecord {
   refDes: string;
   footprint: string | null;
   name: string | null;
 }
 
-interface PinRef {
+export interface PinRef {
   refDes: string;
   pinNumber: string;
 }
 
-interface NetRecord {
+export interface NetRecord {
   name: string;
   pins: PinRef[];
 }
@@ -126,7 +126,7 @@ function parseText(text: string): ParsedNetlistData {
 // DB upserts
 // ---------------------------------------------------------------------------
 
-async function upsertComponents(
+export async function upsertComponents(
   projectId: string,
   components: ComponentRecord[]
 ): Promise<void> {
@@ -149,7 +149,7 @@ async function upsertComponents(
   }
 }
 
-async function upsertNets(
+export async function upsertNets(
   projectId: string,
   nets: NetRecord[]
 ): Promise<void> {
@@ -162,7 +162,7 @@ async function upsertNets(
   }
 }
 
-async function upsertPinsAndConnections(
+export async function upsertPinsAndConnections(
   projectId: string,
   nets: NetRecord[]
 ): Promise<number> {
