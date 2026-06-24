@@ -19,6 +19,7 @@ import {
   tracePin,
 } from "@/lib/board-queries";
 import { getCachedSpecs } from "@/server/services/datasheet-service";
+import { searchDocuments } from "@/server/services/document-service";
 import { prisma } from "@/lib/prisma";
 
 // ── tool definitions ──────────────────────────────────────────────────────────
@@ -130,6 +131,25 @@ export const boardTools: Anthropic.Messages.Tool[] = [
       required: ["refdes"],
     },
   },
+  {
+    name: "search_documents",
+    description:
+      "Full-text search across all uploaded documents (PDFs, datasheets, app notes, specs, markdown files) for this project. Returns the most relevant text chunks. Use when the user asks about something that might be in an uploaded document rather than the netlist or BOM.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description: "Search query — use specific technical terms, part numbers, or phrases.",
+        },
+        limit: {
+          type: "number",
+          description: "Max chunks to return (default 5, max 10).",
+        },
+      },
+      required: ["query"],
+    },
+  },
 ];
 
 // ── executor ──────────────────────────────────────────────────────────────────
@@ -227,6 +247,16 @@ export async function executeBoardTool(
         return { available: false, reason: "Datasheet not yet fetched for MPN " + comp.mpn };
       }
       return { available: true, mpn: comp.mpn, ...cached };
+    }
+
+    case "search_documents": {
+      const query = input.query;
+      if (typeof query !== "string" || !query.trim()) {
+        return { error: "query is required" };
+      }
+      const limit = typeof input.limit === "number" ? Math.min(input.limit, 10) : 5;
+      const results = await searchDocuments(projectId, query.trim(), limit);
+      return { results, count: results.length };
     }
 
     default:

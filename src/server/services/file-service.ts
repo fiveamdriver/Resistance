@@ -16,6 +16,7 @@ import { parseNetlistFile } from "@/lib/parsers/netlistParser";
 import { saveUploadedFile } from "@/lib/storage";
 import { parseOrThrow, uploadFileMetaSchema } from "@/lib/validation";
 
+import { indexDocumentFile } from "./document-service";
 import { assertProjectExists } from "./project-service";
 
 export interface UploadOutcome {
@@ -140,6 +141,25 @@ export async function uploadFiles(
             parseStatus: "failed",
             parseError:
               err instanceof Error ? err.message : "Unexpected parse error",
+          },
+        });
+      }
+    } else if (category === "pdf" || category === "document") {
+      try {
+        const result = await indexDocumentFile(projectId, projectFileId, absolutePath, category);
+        parseStatus = "parsed";
+        summary = result;
+        await prisma.projectFile.update({
+          where: { id: projectFileId },
+          data: { parseStatus: "parsed" },
+        });
+      } catch (err) {
+        parseStatus = "failed";
+        await prisma.projectFile.update({
+          where: { id: projectFileId },
+          data: {
+            parseStatus: "failed",
+            parseError: err instanceof Error ? err.message : "Document parse error",
           },
         });
       }
