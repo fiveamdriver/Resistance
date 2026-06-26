@@ -9,11 +9,11 @@ export default function HomePage() {
       <div className="relative z-10">
 
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
-        <section className="relative flex min-h-screen items-center [scroll-snap-align:start] [scroll-snap-stop:always]">
-          <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-16 px-6 pt-16 pb-16 lg:grid-cols-[auto_1fr] lg:items-start lg:gap-12">
+        <section className="relative flex min-h-screen items-start [scroll-snap-align:start] [scroll-snap-stop:always]">
+          <div className="grid w-full grid-cols-1 gap-16 px-8 pt-28 pb-16 lg:grid-cols-[auto_1fr] lg:items-start lg:gap-12 xl:px-16">
 
             {/* Left: copy ─────────────────────────────────────────────────── */}
-            <div className="relative z-10">
+            <div className="relative z-10 pt-10">
               <span className="inline-block rounded border border-[rgba(255,255,255,0.09)] px-2.5 py-1 font-mono text-xs text-[#374151]">
                 Altium export intelligence · Beta
               </span>
@@ -51,8 +51,8 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Right: live connectivity graph — frameless ──────────────────── */}
-            <div className="relative h-[min(665px,60vh)] w-full mt-20 overflow-hidden xl:w-[calc(100%+8rem)] xl:-ml-52">
+            {/* Right: live connectivity graph ──────────────────────────── */}
+            <div className="relative z-0 h-[80vh] w-full overflow-hidden lg:-ml-24 mt-8 [@media(min-height:800px)]:mt-0">
               <ConnectivityHeroGraph />
             </div>
 

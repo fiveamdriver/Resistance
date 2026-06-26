@@ -22,7 +22,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-[#050505]">
         <header className="sticky top-0 z-50">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
+          <div className="flex w-full items-center justify-between px-8 py-5 xl:px-16">
             <Link href="/" className="text-[32px] font-bold tracking-tight text-[#F5F0E8]">
               Resistance
             </Link>
