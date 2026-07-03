@@ -49,6 +49,11 @@ model Project {
   ownerId String?
   owner   User?   @relation(fields: [ownerId], references: [id])
 
+  // JSON blob written by the KiCad MCP server's sync_to_resistance tool:
+  // { syncedAt, boardMtime, kicadVersion }. String because Prisma's SQLite
+  // connector has no Json type.
+  syncMeta String?
+
   files          ProjectFile[]
   components      Component[]
   nets           Net[]

@@ -9,7 +9,11 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { NotFoundError } from "@/lib/errors";
-import { createProjectSchema, parseOrThrow } from "@/lib/validation";
+import {
+  createProjectSchema,
+  parseOrThrow,
+  updateProjectSchema,
+} from "@/lib/validation";
 
 export async function listProjects() {
   return prisma.project.findMany({
@@ -72,4 +76,22 @@ export async function assertProjectExists(projectId: string) {
     select: { id: true },
   });
   if (!exists) throw new NotFoundError("Project not found");
+}
+
+/**
+ * Partial project update. Today the only mutable field is syncMeta (stamped
+ * by the KiCad MCP server after a sync); stored as a JSON string because the
+ * SQLite connector has no Json type.
+ */
+export async function updateProject(projectId: string, input: unknown) {
+  const data = parseOrThrow(
+    updateProjectSchema,
+    input,
+    "Invalid project update payload"
+  );
+  await assertProjectExists(projectId);
+  return prisma.project.update({
+    where: { id: projectId },
+    data: { syncMeta: JSON.stringify(data.syncMeta) },
+  });
 }

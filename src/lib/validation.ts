@@ -31,6 +31,21 @@ export const createProjectSchema = z.object({
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
 /**
+ * PATCH /api/projects/[id] body. Currently only carries syncMeta, written by
+ * the KiCad MCP server after pushing netlist + BOM so the assistant can
+ * surface staleness ("last synced 3 hours ago").
+ */
+export const updateProjectSchema = z.object({
+  syncMeta: z.object({
+    syncedAt: z.string().datetime({ offset: true }),
+    boardMtime: z.string().datetime({ offset: true }),
+    kicadVersion: z.string().max(40),
+  }),
+});
+
+export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+
+/**
  * Validate an uploaded file's metadata (name + size). The actual bytes are
  * streamed to disk by the storage layer; here we gate type and size.
  */

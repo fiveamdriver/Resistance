@@ -1,0 +1,55 @@
+{
+  "board": {
+    "design_settings": {
+      "defaults": {},
+      "rules": {}
+    }
+  },
+  "meta": {
+    "filename": "hier.kicad_pro",
+    "version": 3
+  },
+  "net_settings": {
+    "classes": [
+      {
+        "name": "Default",
+        "priority": 2147483647
+      },
+      {
+        "name": "Power",
+        "priority": 0
+      }
+    ],
+    "meta": {
+      "version": 4
+    },
+    "netclass_assignments": {
+      "GND": "Power"
+    },
+    "netclass_patterns": [
+      {
+        "netclass": "Power",
+        "pattern": "RAIL_*"
+      }
+    ]
+  },
+  "schematic": {
+    "legacy_lib_dir": "",
+    "legacy_lib_list": []
+  },
+  "sheets": [
+    [
+      "aaaaaaaa-0000-0000-0000-000000000001",
+      "Root"
+    ],
+    [
+      "bbbbbbbb-0000-0000-0000-000000000001",
+      "rail_a"
+    ],
+    [
+      "bbbbbbbb-0000-0000-0000-000000000002",
+      "rail_b"
+    ]
+  ],
+  "text_variables": {}
+}
