@@ -38,18 +38,21 @@ describe("parseKicadNetlistText", () => {
       name: "STM32F446RET6",
       footprint: "Package_QFP:LQFP-64_10x10mm_P0.5mm",
       mpn: null,
+      datasheetUrl: null,
     });
     expect(components[1]).toEqual({
       refDes: "R1",
       name: "10k",
       footprint: "Resistor_SMD:R_0402_1005Metric",
       mpn: null,
+      datasheetUrl: null,
     });
     expect(components[2]).toEqual({
       refDes: "C1",
       name: "100nF",
       footprint: "Capacitor_SMD:C_0402_1005Metric",
       mpn: null,
+      datasheetUrl: null,
     });
   });
 
@@ -124,6 +127,27 @@ describe("parseKicadNetlistText", () => {
     expect(components).toHaveLength(2);
     expect(components[0].mpn).toBe("TPS54331DR");
     expect(components[1].mpn).toBeNull();
+  });
+
+  it("extracts the Datasheet property as datasheetUrl (http/https only)", () => {
+    const withDatasheet = `(export (version "E")
+  (components
+    (comp (ref "U1")
+      (value "TPS54331DR")
+      (property (name "Datasheet") (value "https://www.ti.com/lit/ds/symlink/tps54331.pdf")))
+    (comp (ref "R1")
+      (value "10k")
+      (property (name "Datasheet") (value "~")))
+    (comp (ref "C1")
+      (value "100nF")
+      (datasheet "https://example.com/c1.pdf")))
+  (nets))`;
+    const { components } = parseKicadNetlistText(withDatasheet);
+    expect(components[0].datasheetUrl).toBe(
+      "https://www.ti.com/lit/ds/symlink/tps54331.pdf"
+    );
+    expect(components[1].datasheetUrl).toBeNull(); // "~" = empty in KiCad
+    expect(components[2].datasheetUrl).toBe("https://example.com/c1.pdf");
   });
 
   it("does not confuse (comp ...) with (components ...) or (net ...) with (nets ...)", () => {

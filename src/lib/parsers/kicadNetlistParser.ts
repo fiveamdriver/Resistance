@@ -120,15 +120,25 @@ export function parseKicadNetlistText(text: string): {
     const refDes = extractAttr(compBlock, "ref");
     if (!refDes) continue;
 
-    // Extract MPN from (property (name "MPN#") (value "...")) blocks.
-    // KiCad 6+ emits these alongside the (fields ...) block; (property ...) uses
-    // the standard (name) / (value) attribute format and is easier to parse.
+    // Extract MPN and Datasheet from (property (name "...") (value "..."))
+    // blocks. KiCad 6+ emits these alongside the (fields ...) block;
+    // (property ...) uses the standard (name)/(value) format and is easier to
+    // parse. "Datasheet" is a stock KiCad symbol field.
     let mpn: string | null = null;
+    let datasheetUrl: string | null = null;
     for (const propBlock of extractBlocks(compBlock, "property")) {
-      if (extractAttr(propBlock, "name") === "MPN#") {
+      const propName = extractAttr(propBlock, "name");
+      if (propName === "MPN#" && mpn === null) {
         mpn = extractAttr(propBlock, "value");
-        break;
+      } else if (propName === "Datasheet" && datasheetUrl === null) {
+        datasheetUrl = extractAttr(propBlock, "value");
       }
+    }
+    // Netlists also carry a bare (datasheet "...") attribute on the comp.
+    datasheetUrl = datasheetUrl ?? extractAttr(compBlock, "datasheet");
+    // KiCad uses "~" for empty; only keep real web URLs.
+    if (datasheetUrl && !/^https?:\/\//i.test(datasheetUrl)) {
+      datasheetUrl = null;
     }
 
     components.push({
@@ -136,6 +146,7 @@ export function parseKicadNetlistText(text: string): {
       name: extractAttr(compBlock, "value"),
       footprint: extractAttr(compBlock, "footprint"),
       mpn,
+      datasheetUrl,
     });
   }
 

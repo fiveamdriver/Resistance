@@ -13,6 +13,12 @@ export interface FileVM {
   category: string;
   fileType: string;
   parseStatus: "pending" | "parsed" | "failed";
+  /** "upload" | "design_link" | "web_fetch" — how the document arrived. */
+  provenance: string;
+  /** "verified" | "quarantined" | "superseded" — gate outcome / lifecycle. */
+  verifyStatus: string;
+  /** MPN the document describes (auto-ingested datasheets). */
+  mpn: string | null;
   sizeBytes: number;
   uploadedAt: string; // ISO string
 }
@@ -71,6 +77,11 @@ export interface DashboardVM {
   bomItems: BomItemVM[];
   graph: ConnectivityGraph;
   documentChunkCount: number;
+  /**
+   * Datasheet coverage: how many of the project's distinct MPNs have a
+   * verified datasheet on file. Null when the design has no MPNs.
+   */
+  datasheetCoverage: { covered: number; total: number } | null;
   /** Most recent design-review run, or null if none has been run yet. */
   latestReview: ReviewRunVM | null;
 }

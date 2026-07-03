@@ -1,8 +1,28 @@
 # Automatic Datasheet Ingestion — Plan
 
-Status: proposal, not implemented. Follows from the KiCad MCP server work
-(`packages/kicad-mcp/PLAN.md`) and the existing MPN spec-fetch pipeline
-(`src/server/services/datasheet-service.ts`).
+Status: **implemented 2026-07-02** (all three phases + the fixes-alongside).
+Follows from the KiCad MCP server work (`packages/kicad-mcp/PLAN.md`) and the
+existing MPN spec-fetch pipeline (`src/server/services/datasheet-service.ts`).
+
+Implementation deviations from the plan below (all verified end-to-end
+against a real datasheet download):
+
+- **FTS5 went further than planned**: the index is an external-content table
+  maintained by SQLite triggers on `DocumentChunk`, so application code never
+  writes to the index at all — drift is impossible by construction, and
+  `prisma db push` dropping the FTS table is harmless (rebuilt at startup,
+  `src/lib/fts.ts`).
+- **Hard-fail vs quarantine**: downloads that aren't PDFs at all (HTML
+  product pages, oversized files) are recorded as failures without creating
+  a quarantined file — there is nothing meaningful for a human to review.
+  Quarantine is reserved for real PDFs that fail identity/quality checks.
+- **No DB-backed job queue yet**: tier-2/3 passes run fire-and-forget after
+  parses (`file-service.ts`) and review runs (`review-service.ts`), bounded
+  by `DATASHEET_INGEST_LIMIT` (default 10 per run). A real queue can replace
+  this without interface changes.
+- **Fetch-limit config lives in a Resistance env var** for now, not the MCP
+  server env (phx's answer #3) — the MCP server has no channel to set
+  Resistance's per-run cap. Revisit if per-project limits are needed.
 
 ## Why this adds value to Resistance
 
@@ -229,17 +249,22 @@ escaping bug makes this failure mode common for part-number queries today.)
   FTS5 table + transactional writes; add a startup reconcile pass as a
   belt-and-suspenders (the FTS5 table is already auto-created on startup).
 
-## Open questions for phx
+## Open questions for phx — ANSWERED 2026-07-02
 
-1. Does `sync_to_resistance` already carry the symbol `Datasheet` property
-   through, or is that the one-line addition in Phase 2?
-2. Revision pinning: is "latest datasheet found online" acceptable for
-   tier 2/3, or should mismatches against the design's stated revision be
-   flagged? (Verification gate checks *part identity*, not *revision*.)
-3. Where should per-project fetch limits/config live — env var on the MCP
-   server, or Resistance-side setting?
-4. Quarantine review UX: is a files-table badge + one-click approve enough,
-   or should the assistant be able to request approval mid-conversation?
+1. **Does sync carry the Datasheet property?** phx expected yes; code check
+   says no. `file_parser.py` captures the property into
+   `ComponentInfo.properties` (so `list_components` shows it), but
+   `bom.py` strips `datasheet` via `_STOCK_KEYS` and the sync CSV has no
+   Datasheet column; on the Resistance side `kicadNetlistParser.ts` ignores
+   the field and `Component` has no column for it. Phase 2 therefore
+   touches both sides: add the CSV column in the MCP server, parse + store
+   it in Resistance.
+2. **Revision pinning:** latest datasheet found online is acceptable. The
+   verification gate checks part identity only; no revision matching.
+3. **Fetch limits/config:** live on the MCP server (env vars), not
+   Resistance-side settings.
+4. **Quarantine review UX:** files-table badge + one-click approve is
+   enough. No mid-conversation approval tool.
 
 ## Effort estimate
 

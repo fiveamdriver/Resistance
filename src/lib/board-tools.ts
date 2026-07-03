@@ -134,7 +134,7 @@ export const boardTools: Anthropic.Messages.Tool[] = [
   {
     name: "search_documents",
     description:
-      "Full-text search across all uploaded documents (PDFs, datasheets, app notes, specs, markdown files) for this project. Returns the most relevant text chunks. Use when the user asks about something that might be in an uploaded document rather than the netlist or BOM.",
+      "Full-text search across the project's verified documents (PDFs, datasheets, app notes, specs, markdown files). Returns the most relevant text chunks, each with its source file, page number, and provenance ('upload' = human-uploaded, 'design_link' = fetched from the engineer's datasheet link, 'web_fetch' = found online by part number). When citing a result, name the file and page. Use when the user asks about something that might be in a document rather than the netlist or BOM. If the tool returns an error, report that document search failed — do not treat it as 'no documents'.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -255,8 +255,18 @@ export async function executeBoardTool(
         return { error: "query is required" };
       }
       const limit = typeof input.limit === "number" ? Math.min(input.limit, 10) : 5;
-      const results = await searchDocuments(projectId, query.trim(), limit);
-      return { results, count: results.length };
+      try {
+        const results = await searchDocuments(projectId, query.trim(), limit);
+        return { results, count: results.length };
+      } catch (err) {
+        // Search failure must be distinguishable from "no matches" so the
+        // model reports a broken search instead of an empty library.
+        return {
+          error:
+            "Document search failed: " +
+            (err instanceof Error ? err.message : "unknown error"),
+        };
+      }
     }
 
     default:

@@ -29,9 +29,27 @@ function toViewModel(
     category: f.category,
     fileType: f.fileType,
     parseStatus: f.parseStatus as ParseStatus,
+    provenance: f.provenance,
+    verifyStatus: f.verifyStatus,
+    mpn: f.mpn,
     sizeBytes: f.sizeBytes,
     uploadedAt: f.uploadedAt.toISOString(),
   }));
+
+  // Datasheet coverage: distinct component MPNs vs. those with a verified
+  // datasheet on file (auto-ingested docs carry their MPN).
+  const designMpns = new Set(
+    project.components.map((c) => c.mpn).filter((m): m is string => !!m)
+  );
+  const coveredMpns = new Set(
+    project.files
+      .filter((f) => f.verifyStatus === "verified" && f.mpn && designMpns.has(f.mpn))
+      .map((f) => f.mpn as string)
+  );
+  const datasheetCoverage =
+    designMpns.size > 0
+      ? { covered: coveredMpns.size, total: designMpns.size }
+      : null;
 
   const run = project.reviewRuns[0];
   const latestReview: ReviewRunVM | null = run
@@ -92,6 +110,7 @@ function toViewModel(
     })),
     graph,
     documentChunkCount: project._count.documentChunks,
+    datasheetCoverage,
     latestReview,
   };
 }

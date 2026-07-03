@@ -53,6 +53,14 @@ def _extract_fields(properties: dict[str, str]) -> tuple[dict[str, str | None], 
     return canonical, extras
 
 
+def _datasheet_url(properties: dict[str, str]) -> str | None:
+    """The stock Datasheet field, if it holds a real web URL ("~" = empty)."""
+    for k, v in properties.items():
+        if _norm(k) == "datasheet" and v and v.lower().startswith(("http://", "https://")):
+            return v
+    return None
+
+
 def get_bom(root_sch_path: Path, include_dnp: bool = False) -> list[BomRow]:
     symbols = load_all_symbols(root_sch_path)
     groups: dict[tuple, list[SymbolInstance]] = {}
@@ -79,6 +87,7 @@ def get_bom(root_sch_path: Path, include_dnp: bool = False) -> list[BomRow]:
                 voltage_rating=canonical["voltage_rating"],
                 current_rating=canonical["current_rating"],
                 power_rating=canonical["power_rating"],
+                datasheet=_datasheet_url(members[0].properties),
                 qty=len(members),
                 extra_properties=extras,
             )
@@ -96,12 +105,12 @@ def bom_to_csv(rows: list[BomRow]) -> str:
     writer = csv.writer(buf)
     writer.writerow(
         ["Reference", "Value", "Footprint", "MPN", "Manufacturer", "Tolerance",
-         "Voltage Rating", "Current Rating", "Power Rating", "Quantity"]
+         "Voltage Rating", "Current Rating", "Power Rating", "Datasheet", "Quantity"]
     )
     for r in rows:
         writer.writerow(
             [" ".join(r.refdes), r.value, r.footprint, r.mpn or "", r.manufacturer or "",
              r.tolerance or "", r.voltage_rating or "", r.current_rating or "",
-             r.power_rating or "", r.qty]
+             r.power_rating or "", r.datasheet or "", r.qty]
         )
     return buf.getvalue()

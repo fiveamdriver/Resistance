@@ -39,6 +39,8 @@ export interface ComponentRecord {
   footprint: string | null;
   name: string | null;
   mpn: string | null;
+  /** Datasheet URL from the design (KiCad "Datasheet" property), if any. */
+  datasheetUrl?: string | null;
 }
 
 export interface PinRef {
@@ -140,6 +142,7 @@ export async function upsertComponents(
         ...(comp.name != null ? { name: comp.name } : {}),
         ...(comp.footprint != null ? { footprint: comp.footprint } : {}),
         ...(comp.mpn != null ? { mpn: comp.mpn } : {}),
+        ...(comp.datasheetUrl != null ? { datasheetUrl: comp.datasheetUrl } : {}),
       },
       create: {
         projectId,
@@ -147,6 +150,7 @@ export async function upsertComponents(
         name: comp.name,
         footprint: comp.footprint,
         mpn: comp.mpn,
+        datasheetUrl: comp.datasheetUrl ?? null,
       },
     });
   }

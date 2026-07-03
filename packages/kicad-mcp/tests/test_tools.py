@@ -114,6 +114,16 @@ def test_bom_groups_instances_and_normalizes_properties():
     assert row.value == "10k"
     assert row.mpn == "RC0603FR-0710KL"  # matched from "MPN#" via fuzzy alias
     assert row.tolerance == "1%"
+    # Stock Datasheet field carried through (http(s) URLs only)
+    assert row.datasheet is not None and row.datasheet.startswith("https://www.yageo.com/")
+
+
+def test_bom_csv_includes_datasheet_column():
+    rows = bom.get_bom(ROOT_SCH)
+    csv_text = bom.bom_to_csv(rows)
+    header, first = csv_text.splitlines()[:2]
+    assert "Datasheet" in header.split(",")
+    assert "https://www.yageo.com/" in first
 
 
 # ── project info ────────────────────────────────────────────────────────────

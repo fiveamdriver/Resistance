@@ -49,7 +49,16 @@ export function DashboardTabs({ vm }: { vm: DashboardVM }) {
         {active === "Files" && (
           <div className="space-y-4">
             <FileUpload projectId={vm.project.id} />
-            <FilesTable files={vm.files} />
+            {vm.datasheetCoverage && (
+              <p className="text-xs text-[#94a3b8]">
+                Datasheet coverage:{" "}
+                <span className="font-medium text-[#F5F0E8]">
+                  {vm.datasheetCoverage.covered}/{vm.datasheetCoverage.total}
+                </span>{" "}
+                parts with an MPN have a verified datasheet on file.
+              </p>
+            )}
+            <FilesTable projectId={vm.project.id} files={vm.files} />
           </div>
         )}
         {active === "Components" && (

@@ -77,6 +77,7 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   value: ["value", "val", "component value"],
   footprint: ["footprint", "package", "pcb footprint", "pattern", "land pattern"],
   quantity: ["quantity", "qty", "count", "amount", "num"],
+  datasheet: ["datasheet", "datasheet url", "datasheet link"],
 };
 
 /**
@@ -110,6 +111,7 @@ interface ColumnMap {
   value: number;
   footprint: number;
   quantity: number;
+  datasheet: number;
 }
 
 function buildColumnMap(headers: string[]): ColumnMap {
@@ -121,6 +123,7 @@ function buildColumnMap(headers: string[]): ColumnMap {
     value: resolveColumn(headers, COLUMN_ALIASES.value),
     footprint: resolveColumn(headers, COLUMN_ALIASES.footprint),
     quantity: resolveColumn(headers, COLUMN_ALIASES.quantity),
+    datasheet: resolveColumn(headers, COLUMN_ALIASES.datasheet),
   };
 }
 
@@ -226,11 +229,19 @@ async function upsertBomRow(
   }
 
   // BOM is authoritative for MPN — write it back to each linked Component so
-  // the datasheet enrichment pipeline can find it without a join.
-  if (mpn && componentIds.length > 0) {
+  // the datasheet enrichment pipeline can find it without a join. Same for the
+  // Datasheet URL (KiCad stock field, carried through the MCP sync CSV), which
+  // drives tier-2 design_link ingestion.
+  const datasheetRaw = cell(row, cols.datasheet);
+  const datasheetUrl =
+    datasheetRaw && /^https?:\/\//i.test(datasheetRaw) ? datasheetRaw : null;
+  if ((mpn || datasheetUrl) && componentIds.length > 0) {
     await prisma.component.updateMany({
       where: { id: { in: componentIds.map((c) => c.id) } },
-      data: { mpn },
+      data: {
+        ...(mpn ? { mpn } : {}),
+        ...(datasheetUrl ? { datasheetUrl } : {}),
+      },
     });
   }
 

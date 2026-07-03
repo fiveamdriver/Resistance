@@ -65,6 +65,9 @@ class BomRow:
     voltage_rating: str | None
     current_rating: str | None
     power_rating: str | None
+    # Stock KiCad "Datasheet" field, http(s) URLs only ("~" and local paths
+    # dropped). Resistance ingests the linked PDF as a tier-2 datasheet.
+    datasheet: str | None
     qty: int
     extra_properties: dict[str, str] = field(default_factory=dict)
 

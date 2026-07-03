@@ -17,6 +17,7 @@ import { saveUploadedFile } from "@/lib/storage";
 import { parseOrThrow, uploadFileMetaSchema } from "@/lib/validation";
 
 import { indexDocumentFile } from "./document-service";
+import { ingestDesignLinkedDatasheets } from "./ingest-service";
 import { assertProjectExists } from "./project-service";
 
 export interface UploadOutcome {
@@ -183,6 +184,19 @@ export async function uploadFiles(
     }
 
     outcomes.push({ fileName: file.name, ok: true, projectFileId, parseStatus, summary });
+  }
+
+  // A successful netlist/BOM parse may have added Component.datasheetUrl
+  // values (KiCad "Datasheet" property carried through the MCP sync). Kick
+  // off tier-2 ingestion fire-and-forget: the upload response never waits on
+  // datasheet downloads; coverage improves in the background.
+  const parsedDesignData = outcomes.some(
+    (o) => o.ok && o.parseStatus === "parsed"
+  );
+  if (parsedDesignData) {
+    void ingestDesignLinkedDatasheets(projectId).catch((err) =>
+      console.error("[ingest] design-link datasheet pass failed:", err)
+    );
   }
 
   return outcomes;

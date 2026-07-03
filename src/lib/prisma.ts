@@ -1,5 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
+import { ensureFtsSchema } from "./fts";
+
 // Reuse a single PrismaClient across hot-reloads in development to avoid
 // exhausting database connections.
 const globalForPrisma = globalThis as unknown as {
@@ -18,10 +20,11 @@ if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
 
-// Create the FTS5 virtual table on first initialization. IF NOT EXISTS makes
-// this a no-op if the migration has already been applied.
+// Ensure the FTS5 index (external-content table + sync triggers) exists and
+// matches DocumentChunk on first initialization. Idempotent; rebuilds the
+// index from chunks when shapes or counts diverge.
 if (isNew) {
-  prisma
-    .$executeRaw`CREATE VIRTUAL TABLE IF NOT EXISTS document_chunks_fts USING fts5(content, chunk_id UNINDEXED, project_id UNINDEXED)`
-    .catch((err) => console.error("[prisma] FTS5 init failed:", err));
+  ensureFtsSchema(prisma).catch((err) =>
+    console.error("[prisma] FTS5 init failed:", err)
+  );
 }

@@ -50,7 +50,7 @@ async function fetchSpecsFromWeb(
 Search for the datasheet and extract the following information. Return ONLY a JSON object with these exact fields (use null for any field you cannot find):
 
 {
-  "datasheetUrl": "the URL of the datasheet PDF or product page",
+  "datasheetUrl": "the URL of the datasheet — prefer the direct PDF link over a product page",
   "maxVoltageV": <absolute maximum voltage rating in volts, as a number>,
   "maxCurrentA": <absolute maximum current rating in amps, as a number>,
   "tempRangeMinC": <minimum operating temperature in Celsius, as a number>,

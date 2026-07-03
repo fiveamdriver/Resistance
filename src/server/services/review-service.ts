@@ -29,6 +29,7 @@ import type { ReviewResult } from "@/lib/review-types";
 
 import { assertProjectExists } from "./project-service";
 import { enrichProjectMpns } from "./datasheet-service";
+import { ingestWebFetchedDatasheets } from "./ingest-service";
 
 const DEFAULT_MODEL = "claude-sonnet-4-6";
 const MAX_ROUNDS = 10;
@@ -103,6 +104,12 @@ export async function runReview(
   // whatever specs are available, falling back to "verify" severity for parts
   // whose datasheets could not be fetched.
   await enrichProjectMpns(projectId).catch(() => {});
+
+  // Tier-3 document ingestion: the enrichment pass just found datasheet URLs;
+  // pull the full PDFs into the searchable library in the background so
+  // search_documents can ground this and future reviews. Never blocks or
+  // fails the review.
+  void ingestWebFetchedDatasheets(projectId).catch(() => {});
 
   const model = options.model || DEFAULT_MODEL;
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });

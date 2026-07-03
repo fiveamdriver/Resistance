@@ -77,6 +77,19 @@ model ProjectFile {
   // Parse lifecycle: "pending" | "parsed" | "failed"
   parseStatus  String   @default("pending")
   parseError   String?
+  // Where the document came from: "upload" (human) | "design_link" (Datasheet
+  // URL from the KiCad symbol) | "web_fetch" (found by the spec-fetch search).
+  provenance   String   @default("upload")
+  // Original URL for design_link / web_fetch documents.
+  sourceUrl    String?
+  // Verification gate result: "verified" (searchable) | "quarantined" (stored
+  // but never indexed; awaiting one-click human approval).
+  verifyStatus String   @default("verified")
+  // sha256 of file bytes; dedupes datasheets across projects (DatasheetLibrary).
+  contentHash  String?
+  // MPN this document describes (datasheets). Drives the one-live-doc-per-
+  // (project, mpn) dedupe rule and the coverage metric.
+  mpn          String?
   uploadedAt   DateTime @default(now())
 
   project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -95,6 +108,9 @@ model Component {
   value       String? // e.g. "10k", "100nF"
   footprint   String?
   mpn         String? // manufacturer part number; populated from KiCad fields or BOM
+  // Datasheet URL from the design (KiCad symbol "Datasheet" property), carried
+  // through the MCP sync BOM CSV. Drives tier-2 (design_link) ingestion.
+  datasheetUrl String?
 
   project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   pins     Pin[]
@@ -172,6 +188,9 @@ model DocumentChunk {
   projectId  String
   fileId     String?
   chunkIndex Int     @default(0)
+  // 1-based page number in the source document (PDFs); null when the source
+  // has no page structure. Enables "cite file + page" grounding.
+  page       Int?
   content    String
   // Embedding stored as JSON string for Phase 1 portability. In Postgres this
   // becomes a pgvector column later.
@@ -201,6 +220,21 @@ model ReviewRun {
   findings Finding[]
 
   @@index([projectId])
+}
+
+/// Global datasheet document library. A datasheet is a fact about a part, not a
+/// project: tier-2/3 documents are stored once per (mpn, contentHash) and linked
+/// into projects as ProjectFile rows pointing at the same stored file, so the
+/// same LM317 PDF is fetched and stored once for the whole installation.
+model DatasheetLibrary {
+  id          String   @id @default(cuid())
+  mpn         String
+  contentHash String   @unique // sha256 of file bytes
+  filePath    String // path relative to the uploads root (shared "library" dir)
+  sourceUrl   String?
+  fetchedAt   DateTime @default(now())
+
+  @@index([mpn])
 }
 
 /// Global per-MPN datasheet cache. Keyed by MPN only — shared across all projects

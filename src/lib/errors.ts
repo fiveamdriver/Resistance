@@ -13,7 +13,8 @@ export type AppErrorCode =
   | "UNSUPPORTED_FILE_TYPE"
   | "FILE_TOO_LARGE"
   | "STORAGE_ERROR"
-  | "PARSE_ERROR";
+  | "PARSE_ERROR"
+  | "INGEST_ERROR";
 
 export class AppError extends Error {
   readonly code: AppErrorCode;

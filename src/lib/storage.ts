@@ -60,6 +60,38 @@ export async function saveUploadedFile(
 }
 
 /**
+ * Persist a datasheet into the shared library area (`uploads/library/`),
+ * named by content hash so identical documents are stored exactly once
+ * across all projects. Idempotent: an existing file is left untouched.
+ */
+export async function saveLibraryFile(
+  contentHash: string,
+  ext: string,
+  bytes: Buffer
+): Promise<StoredFile> {
+  const storedName = `${contentHash}${ext}`;
+  const relativePath = path.join("library", storedName);
+
+  const absoluteDir = path.join(getUploadsRoot(), "library");
+  await mkdir(absoluteDir, { recursive: true });
+
+  const absolutePath = path.join(absoluteDir, storedName);
+  try {
+    // wx: fail if it already exists — first writer wins, content is identical.
+    await writeFile(absolutePath, bytes, { flag: "wx" });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+  }
+
+  return {
+    storedName,
+    relativePath,
+    absolutePath,
+    sizeBytes: bytes.length,
+  };
+}
+
+/**
  * Resolve a DB-stored relative path back to an absolute path on disk, refusing
  * any path that escapes the uploads root (defense-in-depth against traversal,
  * even though stored names are server-generated UUIDs).
