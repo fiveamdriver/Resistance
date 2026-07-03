@@ -46,6 +46,7 @@ def sync_to_resistance(
                 (pcb_path or root_sch_path).stat().st_mtime, tz=timezone.utc
             ).isoformat(),
             "kicadVersion": file_parser.read_generator_version(pcb_path or root_sch_path),
+            "kicadProjectDir": str(root_sch_path.parent),
         }
         resp = client.patch(
             f"/api/projects/{project_id}", json={"syncMeta": sync_meta}

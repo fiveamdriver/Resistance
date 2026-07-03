@@ -20,6 +20,12 @@ import {
 } from "@/lib/board-queries";
 import { getCachedSpecs } from "@/server/services/datasheet-service";
 import { searchDocuments } from "@/server/services/document-service";
+import {
+  getKicadProjectDir,
+  getSchematicHierarchy,
+  runDrc,
+  runErc,
+} from "@/server/services/kicad-service";
 import { prisma } from "@/lib/prisma";
 
 // ── tool definitions ──────────────────────────────────────────────────────────
@@ -150,6 +156,24 @@ export const boardTools: Anthropic.Messages.Tool[] = [
       required: ["query"],
     },
   },
+  {
+    name: "run_drc",
+    description:
+      "Run KiCad Design Rule Check on the board via kicad-cli. Returns violations with severity ('error'|'warning'), rule type, description, and mm coordinates. Use to detect clearance violations, annular width issues, unconnected nets, and other physical layout rule failures. Requires the project to have been synced from KiCad (sync_to_resistance). Returns { error } if the project directory is not known.",
+    input_schema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "run_erc",
+    description:
+      "Run KiCad Electrical Rule Check on the schematic via kicad-cli. Returns violations with severity and description. Use to detect pin conflicts, missing power flags, unconnected pins, and other schematic-level issues. Requires the project to have been synced from KiCad (sync_to_resistance). Returns { error } if the project directory is not known.",
+    input_schema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "get_schematic_hierarchy",
+    description:
+      "Return the schematic sheet tree: root sheet plus all hierarchical sub-sheets, each with its file name, instance path, and symbol count. Use to understand multi-sheet designs before drilling into components. Requires the project to have been synced from KiCad (sync_to_resistance). Returns { error } if the project directory is not known.",
+    input_schema: { type: "object" as const, properties: {} },
+  },
 ];
 
 // ── executor ──────────────────────────────────────────────────────────────────
@@ -265,6 +289,57 @@ export async function executeBoardTool(
           error:
             "Document search failed: " +
             (err instanceof Error ? err.message : "unknown error"),
+        };
+      }
+    }
+
+    case "run_drc": {
+      const projectDir = await getKicadProjectDir(projectId);
+      if (!projectDir) {
+        return {
+          error:
+            "KiCad project directory not found. Sync the project from KiCad first using sync_to_resistance.",
+        };
+      }
+      try {
+        const violations = await runDrc(projectDir);
+        return { violations, count: violations.length };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : "DRC failed" };
+      }
+    }
+
+    case "run_erc": {
+      const projectDir = await getKicadProjectDir(projectId);
+      if (!projectDir) {
+        return {
+          error:
+            "KiCad project directory not found. Sync the project from KiCad first using sync_to_resistance.",
+        };
+      }
+      try {
+        const violations = await runErc(projectDir);
+        return { violations, count: violations.length };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : "ERC failed" };
+      }
+    }
+
+    case "get_schematic_hierarchy": {
+      const projectDir = await getKicadProjectDir(projectId);
+      if (!projectDir) {
+        return {
+          error:
+            "KiCad project directory not found. Sync the project from KiCad first using sync_to_resistance.",
+        };
+      }
+      try {
+        const hierarchy = await getSchematicHierarchy(projectDir);
+        return hierarchy as Record<string, unknown>;
+      } catch (err) {
+        return {
+          error:
+            err instanceof Error ? err.message : "Hierarchy fetch failed",
         };
       }
     }

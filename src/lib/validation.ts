@@ -40,6 +40,7 @@ export const updateProjectSchema = z.object({
     syncedAt: z.string().datetime({ offset: true }),
     boardMtime: z.string().datetime({ offset: true }),
     kicadVersion: z.string().max(40),
+    kicadProjectDir: z.string().max(500).optional(),
   }),
 });
 
