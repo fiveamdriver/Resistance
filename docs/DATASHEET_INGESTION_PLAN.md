@@ -41,6 +41,10 @@ Closing the gap means:
    parts" metric per project turns documentation completeness into something
    the product can drive toward, instead of an invisible gap.
 
+The result: the shelf fills itself, once per part ever, shared by all
+projects — and everything on it can be trusted. The assistant stops running
+out of material, without ever making things up to fill the silence.
+
 ## Anti-hallucination model (hard requirement)
 
 Goal: the assistant must never present datasheet-derived claims that don't
