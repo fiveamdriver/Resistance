@@ -6,40 +6,79 @@ Status: proposal, not implemented. Follows from the KiCad MCP server work
 
 ## Why this adds value to Resistance
 
-Resistance's core promise is an assistant that answers from the engineer's
-*actual design* and the *actual documentation for its parts* — not from
-general knowledge. Today the two halves are unevenly automated:
+Resistance's core promise is an assistant that reviews a design the way a
+careful engineer would: against the actual netlist and the actual
+manufacturer documentation — not from an LLM's general recollection of what
+an LM317 probably does. Today the two halves of that promise are unevenly
+automated.
 
-- **Design data is automatic.** The KiCad MCP server syncs parts, nets, and
-  BOM with zero manual effort, and stays fresh.
-- **Datasheet depth is manual.** Full-text document search (FTS5) only
-  contains PDFs a human remembered to upload. On a 30-part board with 3
-  uploaded datasheets, the assistant can ground deep answers for exactly 3
-  parts and comes up empty for the other 27.
+**Design data is automatic.** The KiCad MCP server syncs components, nets,
+and BOM with zero manual effort and stays current with the board.
 
-The gap is expensive in a specific way: the system *already* visits each
-part's datasheet online (the spec-fetch job reads it to extract ~5 rating
-numbers into `MpnCache`) and then discards the document. We pay the cost of
-finding and reading the datasheet, and keep almost none of the value.
+**Datasheet depth is manual, and thin.** The assistant's per-part knowledge
+comes from two places:
 
-Closing the gap means:
+- `MpnCache`: ~5 headline numbers per MPN (abs-max voltage, max current,
+  operating temp range, derating notes), auto-extracted by a one-time web
+  lookup. Enough to catch "16V-rated cap on a 24V rail." Not enough for
+  anything that lives in the body of the datasheet.
+- FTS5 full-text search: the complete document, but only for PDFs a human
+  manually uploaded. On a 30-part BOM with 3 uploaded datasheets, deep
+  review coverage is exactly 3 parts.
 
-1. **Every part on every board becomes deeply answerable.** Questions like
-   "what does the datasheet say about layout recommendations for U3?" work
-   for all parts, not just the ones with hand-uploaded PDFs.
-2. **Compliance findings get stronger grounding.** Findings can cite the
-   document on file, with page numbers, instead of a 5-number summary.
-3. **Cost scales with the parts catalog, not with usage.** One fetch per
-   part number *ever, across all projects* (see library model below). After
-   ingestion, every question is a local FTS5 search — no per-question
-   web/token cost, no latency.
-4. **The assistant fails less often in front of users.** Today the honest
-   answer to most datasheet questions is "no document found." A self-filling
-   shelf converts the most common dead-end in the product into a working
-   answer — without ever substituting a guess for a document.
-5. **Coverage becomes measurable.** A visible "datasheet coverage: 27/30
-   parts" metric per project turns documentation completeness into something
-   the product can drive toward, instead of an invisible gap.
+The difference matters because most of what makes a datasheet review
+valuable is *not* in the headline ratings table. It's in the body and the
+footnotes: electrolytic ripple-current ratings at temperature, derating
+curves rather than single-point maxima, "abs max applies only below
+T_A = 70°C" footnotes, minimum-load requirements on regulators, dropout vs.
+temperature, startup/sequencing behavior, SW-node layout guidance,
+pin-specific limits. A 5-number summary structurally cannot catch the class
+of problems that experienced reviewers catch — and those are precisely the
+findings that justify an AI review tool to a skeptical EE.
+
+The gap is also cheap to close: the spec-fetch job *already* locates and
+reads each part's datasheet online, extracts five numbers, and discards the
+document. The marginal cost of keeping what was already fetched is close to
+zero; today we pay for the trip and leave the book.
+
+What closing the gap buys, in review terms:
+
+1. **Full-BOM depth instead of upload-dependent depth.** Every MPN on every
+   board becomes answerable at datasheet depth — application/layout
+   guidance, conditions and footnotes, behavior over temperature — not just
+   the parts someone remembered to upload. The assistant's usefulness stops
+   being a function of upload discipline.
+2. **Findings an engineer can verify, not take on faith.** Every
+   datasheet-derived claim must cite the document and page on file — the
+   same standard you'd hold a colleague's design-review redline to. A
+   finding that says "per the datasheet on file, p.7, ripple current is
+   rated at 105°C ambient" can be checked in thirty seconds; "the AI thinks
+   the rating is X" cannot. Reviewability is what makes the findings
+   actionable.
+3. **A trust chain that mirrors engineering practice.** The document
+   hierarchy matches how an EE already ranks sources: the PDF you attached
+   to the project outranks the link you put on the symbol, which outranks
+   whatever a web search turned up — and nothing enters the searchable
+   record without passing incoming inspection (does the document actually
+   contain this MPN? is it a real datasheet and not a distributor summary
+   page? did the text extract cleanly?). Rejects are quarantined for human
+   approval, never silently trusted.
+4. **No fabricated specs, by construction.** The assistant is barred from
+   answering part-spec questions out of model memory: verified-document
+   citation, or an explicit "no datasheet on file." Missing documents stay
+   visibly missing; conflicting sources are flagged rather than silently
+   resolved — the same way a reviewer treats two datasheet revisions that
+   disagree.
+5. **Cost amortizes like a parts library, because it is one.** Datasheets
+   are stored once per MPN globally (content-hashed), shared across all
+   projects — the same economics as a team's approved-parts library. The
+   tenth board using the same buck controller costs nothing new; the
+   library compounds in value as the parts catalog grows, while per-question
+   cost stays a local index lookup (no web, no tokens, no latency).
+6. **BOM documentation coverage becomes a visible, driveable number.**
+   "27/30 parts have a verified datasheet on file" is a meaningful
+   pre-review/pre-release gate — the same completeness check an EE does by
+   hand before a design review, maintained automatically.
 
 ## Anti-hallucination model (hard requirement)
 
