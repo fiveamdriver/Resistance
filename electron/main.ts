@@ -23,7 +23,8 @@ import { assertNoDowngrade, backupDatabase, migrateDatabase } from "./db";
 import { hasApiKey, loadApiKey, saveApiKey } from "./secrets";
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
-const DEV_MODE = process.env.RESISTANCE_DESKTOP_DEV === "1";
+const DEV_MODE =
+  process.env.RESISTANCE_DESKTOP_DEV === "1" || process.argv.includes("--dev");
 const DEV_URL = process.env.RESISTANCE_DESKTOP_DEV_URL ?? "http://localhost:3000";
 const AUTH_HEADER = "x-resistance-token";
 
