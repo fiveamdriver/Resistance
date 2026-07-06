@@ -41,10 +41,21 @@ export async function POST(
     );
   }
 
+  // Optional provenance tag. Only "kicad_sync" (the KiCad MCP server) may be
+  // claimed by API callers; other provenance values are assigned internally.
+  const provenanceEntry = formData.get("provenance");
+  if (provenanceEntry !== null && provenanceEntry !== "kicad_sync") {
+    return NextResponse.json(
+      { error: 'Unsupported "provenance" value. Only "kicad_sync" is accepted.' },
+      { status: 400 }
+    );
+  }
+  const provenance = provenanceEntry === "kicad_sync" ? "kicad_sync" : undefined;
+
   // ── Delegate the full pipeline to the file service ────────────────────────
   let outcomes: Awaited<ReturnType<typeof uploadFiles>>;
   try {
-    outcomes = await uploadFiles(projectId, [fileEntry]);
+    outcomes = await uploadFiles(projectId, [fileEntry], { provenance });
   } catch (err) {
     if (err instanceof NotFoundError) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });

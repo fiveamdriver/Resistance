@@ -51,6 +51,30 @@ function toViewModel(
       ? { covered: coveredMpns.size, total: designMpns.size }
       : null;
 
+  // syncMeta is a JSON string stamped by the KiCad MCP server; treat malformed
+  // or legacy content as "never synced" rather than failing the page.
+  let kicadSync: DashboardVM["kicadSync"] = null;
+  if (project.syncMeta) {
+    try {
+      const meta: unknown = JSON.parse(project.syncMeta);
+      if (
+        meta !== null &&
+        typeof meta === "object" &&
+        "syncedAt" in meta &&
+        typeof meta.syncedAt === "string"
+      ) {
+        const m = meta as { syncedAt: string; boardMtime?: unknown; kicadVersion?: unknown };
+        kicadSync = {
+          syncedAt: m.syncedAt,
+          boardMtime: typeof m.boardMtime === "string" ? m.boardMtime : null,
+          kicadVersion: typeof m.kicadVersion === "string" ? m.kicadVersion : null,
+        };
+      }
+    } catch {
+      // ignore malformed syncMeta
+    }
+  }
+
   const run = project.reviewRuns[0];
   const latestReview: ReviewRunVM | null = run
     ? {
@@ -112,6 +136,7 @@ function toViewModel(
     documentChunkCount: project._count.documentChunks,
     datasheetCoverage,
     latestReview,
+    kicadSync,
   };
 }
 

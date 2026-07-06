@@ -36,6 +36,7 @@ def sync_to_resistance(
             resp = client.post(
                 f"/api/projects/{project_id}/upload",
                 files={"file": (filename, content.encode(), "application/octet-stream")},
+                data={"provenance": "kicad_sync"},
             )
             resp.raise_for_status()
             results[kind] = resp.json()

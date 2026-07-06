@@ -46,7 +46,11 @@ export interface UploadOutcome {
  */
 export async function uploadFiles(
   projectId: string,
-  files: File[]
+  files: File[],
+  opts?: {
+    /** How the files arrived. "kicad_sync" marks pushes from the KiCad MCP server. */
+    provenance?: "upload" | "kicad_sync";
+  }
 ): Promise<UploadOutcome[]> {
   await assertProjectExists(projectId);
 
@@ -79,6 +83,7 @@ export async function uploadFiles(
           category,
           sizeBytes: stored.sizeBytes,
           parseStatus: "pending",
+          provenance: opts?.provenance ?? "upload",
         },
       });
       projectFileId = record.id;

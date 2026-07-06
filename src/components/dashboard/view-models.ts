@@ -84,4 +84,13 @@ export interface DashboardVM {
   datasheetCoverage: { covered: number; total: number } | null;
   /** Most recent design-review run, or null if none has been run yet. */
   latestReview: ReviewRunVM | null;
+  /**
+   * Last push from the KiCad MCP server (parsed from Project.syncMeta), or
+   * null if this project has never been synced from KiCad.
+   */
+  kicadSync: {
+    syncedAt: string; // ISO string
+    boardMtime: string | null; // ISO string
+    kicadVersion: string | null;
+  } | null;
 }

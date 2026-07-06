@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { formatDate } from "@/lib/format";
+
 import { AiAssistant } from "./ai-assistant";
 import { BomTab } from "./bom-tab";
 import { ComponentsTab } from "./components-tab";
@@ -49,6 +51,24 @@ export function DashboardTabs({ vm }: { vm: DashboardVM }) {
         {active === "Files" && (
           <div className="space-y-4">
             <FileUpload projectId={vm.project.id} />
+            {vm.kicadSync && (
+              <p className="text-xs text-[#94a3b8]">
+                Last synced from KiCad
+                {vm.kicadSync.kicadVersion && ` ${vm.kicadSync.kicadVersion}`}:{" "}
+                <span className="font-medium text-[#F5F0E8]">
+                  {formatDate(vm.kicadSync.syncedAt)}
+                </span>
+                {vm.kicadSync.boardMtime && (
+                  <>
+                    {" "}
+                    · board last modified{" "}
+                    <span className="font-medium text-[#F5F0E8]">
+                      {formatDate(vm.kicadSync.boardMtime)}
+                    </span>
+                  </>
+                )}
+              </p>
+            )}
             {vm.datasheetCoverage && (
               <p className="text-xs text-[#94a3b8]">
                 Datasheet coverage:{" "}
