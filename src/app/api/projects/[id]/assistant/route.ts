@@ -18,7 +18,15 @@ import { boardTools, executeBoardTool } from "@/lib/board-tools";
 
 export const runtime = "nodejs";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+/**
+ * Lazy so a missing key fails the request with a clear message instead of
+ * constructing a dead client at module load (the key may be configured after
+ * the server starts, e.g. via the desktop app's settings).
+ */
+function getAnthropicClient(): Anthropic | null {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+}
 
 // ── system prompt — grounding contract ────────────────────────────────────────
 
@@ -90,6 +98,14 @@ export async function POST(
 
   if (!Array.isArray(body?.messages)) {
     return new Response("body.messages must be an array", { status: 400 });
+  }
+
+  const anthropic = getAnthropicClient();
+  if (!anthropic) {
+    return new Response(
+      "The AI assistant is not configured: add your Anthropic API key in settings.",
+      { status: 503 },
+    );
   }
 
   const encoder = new TextEncoder();
