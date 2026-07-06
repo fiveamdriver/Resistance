@@ -48,6 +48,14 @@ the real product from per-user paths.
 2. **Next `output: "standalone"`** so production builds emit a
    self-contained `server.js` the main process spawns on an ephemeral
    localhost port, opening a `BrowserWindow` once it responds.
+   **The local server must be authenticated from day one.** The API has no
+   auth today; a localhost listener without it lets any local process — or
+   a malicious webpage fetching `localhost:<port>` — read board data,
+   upload files, or burn the user's Anthropic key. The main process
+   generates a random token per boot, injects it into the window
+   (preload), and middleware rejects any request not bearing it.
+   Retrofitting auth after routes ship open is far more expensive than
+   designing it into the boot sequence now.
 3. **Baseline and adopt real Prisma migrations.** Today the workflow is
    `db:push` and `prisma/migrations/` holds a single hand-written FTS
    migration with no init baseline and no `migration_lock.toml`. Before
@@ -103,6 +111,11 @@ lands, or Gatekeeper blocks it).
 - Settings surface: API key entry (per Phase 1 decision), `kicad-cli`
   detection (in-app sync shells out to it), and the data-sharing controls
   from the Compliance section below.
+  `kicad-cli` detection cannot be a naive `which`: macOS apps launched
+  from the Dock/Finder inherit a minimal PATH without Homebrew or
+  `/Applications/KiCad/.../bin`, so the lookup must probe well-known
+  install locations per platform and offer a manual path override in
+  settings. (Same caveat applies to anything else the app spawns.)
 
 ## Phase 3 — Packaging, distribution, updates
 
@@ -189,8 +202,21 @@ Required before any user outside the founding team:
 
 ## Sequencing
 
+**Step zero, before committing to Phase 1's estimate: a half-day
+throwaway spike.** Boot this repo's standalone Next build inside a bare
+Electron shell and run one Prisma query against a DB in `userData`. The
+plan asserts Next 15 + React 19 + Prisma 6 + Electron compose cleanly —
+they generally do, but it has not been proven on this codebase, and the
+spike is the cheapest way to find out whether "days, not weeks" is
+honest.
+
 Phase 1 retires the technical risk (standalone Next + Prisma migration
-machinery + key storage; days, not weeks). Phase 2 is quick wins. Phase 3
-is grind, not risk (signing bureaucracy + the Prisma-asar dance + the
-compliance disclosure, which can be drafted any time and should be drafted
-early). Phase 4 is a separate feature track that depends on Phases 1–2.
+machinery + local API auth + key storage; days if the spike is clean).
+Phase 2 is quick wins. Phase 3 is grind, not risk (signing bureaucracy +
+the Prisma-asar dance + the compliance disclosure, which can be drafted
+any time and should be drafted early). Phase 4 is a separate feature
+track that depends on Phases 1–2.
+
+One decision deadline: the BYOK-vs-proxy call (Phase 1, item 6) must be
+made before Phase 2 starts — the settings surface and the compliance
+disclosure both change shape depending on the answer.
