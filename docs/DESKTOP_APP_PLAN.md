@@ -1,6 +1,10 @@
 # Resistance Desktop App — Plan
 
-Status: **proposed 2026-07-05** (not started). Follows from the KiCad sync
+Status: **Phase 1 implemented 2026-07-05** (`47c89ad`) — spike passed and
+the shell boots, migrates, backs up, and authenticates as specified below;
+downgrade refusal and the key-set flow remain untested until a second
+migration and the Phase 2 settings UI exist. Phases 2–4 not started.
+Originally proposed 2026-07-05. Follows from the KiCad sync
 provenance work (`kicad_sync` files + `syncMeta` staleness display) and sets
 up the in-app KiCad folder-link/import flow, which depends on Phases 1–2
 here for the native folder picker.
