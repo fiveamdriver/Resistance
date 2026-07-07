@@ -1,41 +1,43 @@
 # Resistance Desktop App — Plan
 
-Status: **Phase 1 implemented 2026-07-05** (`47c89ad`); **Phase 2
-implemented 2026-07-06** — app menu + Settings (Cmd+,), single-instance
-lock, remembered window bounds, dock icon, native file/folder picker IPC,
-and the /settings page (data-handling disclosure, AI + datasheet-fetch off
-switches enforced server-side, BYOK key entry, kicad-cli detection with
-manual override). The second migration (AppSetting) exercised
-backup-before-migrate for real, and downgrade refusal turned out to be
-**dead as originally written** — Prisma 6's `migrate status` says "up to
-date" even when the DB is ahead of the app — so it now compares the
-`_prisma_migrations` ledger against the local migrations directory
-(electron/read-migrations.ts); both directions are verified. safeStorage
-key roundtrip verified. Still untested: the key-set → backend-restart flow
-end-to-end (needs a real key typed into the UI). **Phase 4 implemented
-2026-07-06** (see its section for notes) — folder link, categorized
-checkbox import, sync button, and opt-in auto-sync watcher all verified
-end-to-end. Phase 3 (packaging/signing) not started; Apple Developer
-enrollment still pending.
-Originally proposed 2026-07-05. Follows from the KiCad sync
-provenance work (`kicad_sync` files + `syncMeta` staleness display) and sets
-up the in-app KiCad folder-link/import flow, which depends on Phases 1–2
-here for the native folder picker.
+Proposed 2026-07-05. Follows from the KiCad sync provenance work
+(`kicad_sync` files + `syncMeta` staleness display).
+
+## Status
+
+| Phase | State |
+| --- | --- |
+| 1 — Electron shell | **Done** 2026-07-05 (`47c89ad`) |
+| 2 — Native app feel + settings | **Done** 2026-07-06 (`0b09c88`) |
+| 3 — Packaging, distribution, updates | Not started |
+| 4 — KiCad folder link / import / auto-sync | **Done** 2026-07-06 (`9affc08`) |
+
+Still open:
+
+- **Apple Developer Program enrollment** (Lance; individual, $99/yr) —
+  gates Phase 3 signing/notarization, and with it giving the app to
+  anyone outside the founding team. Everything else in Phase 3 can be
+  built and tested locally without it.
+- **Compliance item 3** (below): research Anthropic API data-retention
+  terms; the in-app disclosure and off switches (items 1–2) shipped in
+  Phase 2.
+- **One untested flow**: key-set → backend-restart, end-to-end (needs a
+  real key typed into the settings UI).
 
 ## Why this adds value to Resistance
 
 Resistance's promise is that an engineer's design data, documentation, and
-AI review live in one place with zero ceremony. Today the ceremony is real:
-run a dev server, open a browser tab, and drive KiCad sync through an
-external AI agent (the kicad-mcp server is currently the *only* sync path).
-The target experience is: open an application, link a KiCad project folder,
-and everything else follows.
+AI review live in one place with zero ceremony. Before this plan the
+ceremony was real: run a dev server, open a browser tab, and drive KiCad
+sync through an external AI agent (the kicad-mcp server was the *only*
+sync path). The target experience — open an application, link a KiCad
+project folder, and everything else follows — is delivered as of Phase 4.
 
-The codebase is closer to this than a typical web app. It is already a
-local application that happens to render in a browser: SQLite on disk
+The codebase was closer to this than a typical web app. It was already a
+local application that happened to render in a browser: SQLite on disk
 (`DATABASE_URL`), local file storage (`UPLOADS_DIR`, `src/lib/storage.ts`),
 and the assumption that KiCad projects live on the same machine. Both paths
-are env-configurable, which is most of the relocation battle already won.
+are env-configurable, which was most of the relocation battle already won.
 
 ## Approach: Electron wrapping the existing Next server
 
@@ -52,7 +54,7 @@ Alternatives considered:
   becomes a complaint.
 - **Static export + native backend** — a rewrite, not a wrap. No.
 
-## Phase 1 — Electron shell that runs the real app
+## Phase 1 — Electron shell that runs the real app ✅ 2026-07-05
 
 The risk-retiring milestone: the packaged app boots, migrates, and serves
 the real product from per-user paths.
@@ -73,11 +75,11 @@ the real product from per-user paths.
    (preload), and middleware rejects any request not bearing it.
    Retrofitting auth after routes ship open is far more expensive than
    designing it into the boot sequence now.
-3. **Baseline and adopt real Prisma migrations.** Today the workflow is
-   `db:push` and `prisma/migrations/` holds a single hand-written FTS
-   migration with no init baseline and no `migration_lock.toml`. Before
-   anything ships: generate a baseline init migration, add the lock file,
-   and switch the workflow to `prisma migrate dev` / `migrate deploy`.
+3. **Baseline and adopt real Prisma migrations.** The old workflow was
+   `db:push` with a single hand-written FTS migration, no init baseline,
+   no `migration_lock.toml`. Before anything ships: generate a baseline
+   init migration, add the lock file, and switch to `prisma migrate dev` /
+   `migrate deploy`.
 4. **Backup before every migration — non-negotiable.** `migrate deploy`
    can fail mid-migration and leave `_prisma_migrations` in a failed state
    that blocks every subsequent launch. Before running migrations the main
@@ -89,36 +91,38 @@ the real product from per-user paths.
    need to preserve it.
 5. **Downgrade protection.** electron-updater has no rollback, so a user
    who reverts to an older app after a forward migration hits undefined
-   runtime behavior. Store the app's schema version in the DB; on open,
-   an older app seeing a newer schema refuses with a clear message
-   pointing at the pre-migration backup, instead of failing confusingly.
+   runtime behavior. An older app opening a newer DB must refuse with a
+   clear message pointing at the pre-migration backup.
 6. **API key decision — blocker, and product, not just engineering.**
-   `ANTHROPIC_API_KEY` currently comes from the developer's shell
-   environment (it is not even in `.env`). A packaged app has no shell
-   environment, so the assistant (`assistant/route.ts`), AI review
-   (`review-service.ts`), and datasheet auto-ingestion
-   (`datasheet-service.ts`) — the product's core — are all dead on first
-   launch until this is answered:
-   - **Bring-your-own-key**: each user supplies an Anthropic key. Cheapest
-     to build; the user's own Anthropic agreement governs their data.
-     Requires a settings UI and secure storage — Electron `safeStorage`
-     (OS-keychain-backed), never plaintext in userData.
-   - **Proxy backend**: Resistance operates (and pays for) an API proxy.
-     A business model decision — billing, quotas, and a server to run.
-   v1 recommendation: BYOK, with the proxy revisited if Resistance sells
-   to teams. Either way, fix `assistant/route.ts` constructing the
-   Anthropic client at module load with a possibly-undefined key, and
-   replace "set ANTHROPIC_API_KEY in your environment" errors with a
-   pointer to the settings UI.
+   A packaged app has no shell environment, so the assistant, AI review,
+   and datasheet auto-ingestion are dead on first launch until this is
+   answered: **bring-your-own-key** (user's own Anthropic agreement
+   governs their data; needs a settings UI + `safeStorage`) vs. a **proxy
+   backend** (a business model decision — billing, quotas, a server to
+   run). **Decided: BYOK for v1**, proxy revisited if Resistance sells to
+   teams (2026-07-06 discussion: likely hybrid — proxy default with BYOK
+   kept as the advanced option — if/when conversion for strangers
+   matters).
 7. **Dev mode**: `npm run dev:desktop` = Electron window pointed at the
    existing `next dev` server.
 
-Also in Phase 1, on the calendar not the code: **start Apple Developer
-Program enrollment** (see Phase 3 — it has lead time, and nothing built in
-Phases 1–2 may be given to anyone outside the founding team until signing
-lands, or Gatekeeper blocks it).
+**Outcome.** Shipped as specified after a clean half-day spike (see
+Sequencing). Two later corrections from Phase 2's verification work:
 
-## Phase 2 — Make it feel like an application *(implemented 2026-07-06)*
+- **Item 5 as first implemented was dead code** — Prisma 6's
+  `migrate status` reports "up to date" even when the DB contains
+  migrations the app doesn't know, so the regex guard never fired. Rewritten
+  to compare the `_prisma_migrations` ledger against the local migrations
+  directory (`electron/read-migrations.ts`); verified in both directions
+  once a second migration existed.
+- **Item 6's "point errors at settings" was only half done** — the server
+  messages were right but the assistant UI discarded response bodies and
+  showed "check the server logs". Fixed alongside Phase 2.
+
+Apple Developer enrollment (the Phase 1 calendar item) was **not**
+started — still the critical-path item for Phase 3.
+
+## Phase 2 — Make it feel like an application ✅ 2026-07-06
 
 - Native app menu, dock icon, single-instance lock, remembered window
   size/position; external links open in the system browser.
@@ -134,7 +138,24 @@ lands, or Gatekeeper blocks it).
   install locations per platform and offer a manual path override in
   settings. (Same caveat applies to anything else the app spawns.)
 
-## Phase 3 — Packaging, distribution, updates
+**Outcome.** All of the above shipped: app menu with Settings (Cmd+,),
+single-instance lock, window-state persistence, dock icon
+(`scripts/make-icon.mjs` → `electron/assets/icon.png`),
+`pickFile`/`pickFolder` IPC, and `/settings` (disclosure, AI +
+datasheet-fetch switches enforced server-side via the new `AppSetting`
+table, BYOK key entry, kicad-cli detection with manual override — the
+probing immediately proved necessary: a standard `/Applications` KiCad
+install is not on PATH). The second migration exercised
+backup-before-migrate for real and exposed the Phase 1 downgrade-guard
+bug (see Phase 1 outcome). safeStorage key roundtrip and the
+single-instance lock verified directly. In-app the marketing hero is
+skipped: desktop "/" redirects to `/projects` (middleware) and the logo
+follows; the hero remains for the future website.
+
+Known cosmetic dev-mode artifact: the menu bar / Dock label reads
+"Electron" until Phase 3 produces a real `Resistance.app` bundle.
+
+## Phase 3 — Packaging, distribution, updates *(not started)*
 
 - **electron-builder**; macOS `.dmg` first, Windows/Linux later.
 - The known sharp edge is **Prisma inside Electron**: query-engine native
@@ -142,9 +163,9 @@ lands, or Gatekeeper blocks it).
   platform. Well-trodden, but this is where the packaging time goes. (No
   `better-sqlite3` anywhere — Prisma bundles its own engine — so that
   classic native-module rebuild pain does not apply.)
-- macOS code-signing + notarization (Apple Developer ID from the Phase 1
-  enrollment), then **auto-update** via electron-updater against GitHub
-  Releases. electron-updater verifies checksums and handles partial
+- macOS code-signing + notarization (Apple Developer ID — **enrollment
+  still pending**), then **auto-update** via electron-updater against
+  GitHub Releases. electron-updater verifies checksums and handles partial
   downloads; the real update hazard is data, not bits — an update that
   migrates the DB followed by a user downgrade — and the Phase 1
   backup-before-migrate + downgrade-refusal machinery is the fix. Ship
@@ -163,7 +184,13 @@ lands, or Gatekeeper blocks it).
   is invoked as a user-installed external binary and never distributed,
   so KiCad's GPL does not attach to Resistance.
 
-## Phase 4 — The payoff features *(implemented 2026-07-06)*
+Everything here except the signature itself is buildable and locally
+testable before enrollment completes: an unsigned `.dmg` runs on the
+build machine (Gatekeeper only bites third-party downloads), so the
+electron-builder + Prisma-asar work, the app bundle (which also fixes the
+"Electron" naming), and the license audit should not wait on Apple.
+
+## Phase 4 — The payoff features ✅ 2026-07-06
 
 With the shell in place: "Link KiCad project folder" with a native picker,
 inclusive checkbox-scan import (fresh `kicad-cli` netlist/BOM exports
@@ -172,31 +199,44 @@ new `project_folder` provenance), then a file watcher for auto-sync. The
 kicad-mcp Python server stays exactly as it is — the external-agent front
 door — and is not bundled into the app.
 
-Implementation notes (2026-07-06): built as the agreed EDA-adapter
-interface (`src/server/eda/` — KiCad is the first adapter; an Altium
-adapter would return no planned exports and rely on the document scan).
-`folder-sync-service` owns scan/import/syncNow; repeated syncs supersede
-the previous `kicad_sync` exports instead of piling up rows; import paths
-are traversal-checked against the linked root. Auto-sync watchers
-(`watcher-service`) are per-project fs.watch on the folder root, debounced
-2s, reconciled from the DB on first server use and on every project
-update — reconciliation lives in `src/lib/prisma.ts` init, NOT
-`instrumentation.ts`, because instrumentation is also compiled for the
-edge runtime (middleware exists) where the chain's `child_process` import
-can't resolve. The dashboard card (`kicad-folder-card.tsx`) uses the
-desktop folder picker when available and a manual path in the browser.
+**Outcome.** Shipped as the agreed EDA-adapter design:
+
+- `src/server/eda/` — adapter interface; KiCad (kicad-cli) is the first
+  adapter. A future Altium adapter returns no planned exports and relies
+  on the document scan (manual-export tier; Altium has no kicad-cli
+  equivalent).
+- `folder-sync-service` — scan (categorized: recognized EDA project +
+  planned exports / importable documents / everything else behind "show
+  all"), import through the existing upload pipeline, and `syncNow`.
+  Fresh exports supersede the previous sync's `kicad_sync` rows instead
+  of piling up; import paths are traversal-checked against the linked
+  root; syncMeta is stamped in the same shape the MCP server writes.
+- `watcher-service` — opt-in per-project auto-sync: debounced (2s)
+  `fs.watch` on the folder root, re-exports on design-file saves.
+  Watchers are reconciled from the DB on first server use and on project
+  updates. Reconciliation lives in `src/lib/prisma.ts` init, **not**
+  `instrumentation.ts` — instrumentation is also compiled for the edge
+  runtime (middleware exists), where the chain's `child_process` import
+  cannot resolve.
+- `kicad-folder-card.tsx` — link (native picker in the desktop shell,
+  manual path in the browser), sync-now, categorized import dialog,
+  auto-sync toggle, unlink.
+- Schema: `Project.kicadProjectPath` + `Project.autoSyncEnabled`
+  (migration `20260706200000_add_kicad_project_link`).
+
 Verified end-to-end against `packages/kicad-mcp/tests/fixtures/hier`:
-link → scan (categorized, traversal rejected) → import (netlist parsed,
-BOM linked, doc indexed, syncMeta stamped) → sync-now supersede → watcher
-fire on touch + restore after server restart.
+link → scan (traversal attempts rejected) → import (netlist parsed, BOM
+linked, doc indexed, syncMeta stamped) → repeated sync-now supersede →
+watcher fire on touch (root and subsheet) → watcher restore after server
+restart.
 
 ## Compliance & data handling
 
 This section is a **distribution blocker**, not polish: PCB designs are
 routinely confidential company IP, and board data demonstrably leaves the
-machine today.
+machine.
 
-What leaves the machine, as implemented now:
+What leaves the machine, as implemented:
 
 - **AI review** (`review-service.ts`) and the **assistant**
   (`assistant/route.ts` + `board-tools.ts`): netlist, BOM, component, and
@@ -210,12 +250,14 @@ What leaves the machine, as implemented now:
 
 Required before any user outside the founding team:
 
-1. A short, plain-language **data-handling disclosure** in the app: what
-   is sent, to whom, when, and what never leaves the machine.
-2. **Per-tier off switches** in settings: AI features entirely off (app
-   still works as a local design-data organizer), datasheet web-fetch off,
-   crash reporting off (default).
-3. **Research item, do not guess**: Anthropic API data-retention and
+1. ✅ *(Phase 2)* A short, plain-language **data-handling disclosure** in
+   the app: what is sent, to whom, when, and what never leaves the
+   machine. Lives at the top of `/settings`.
+2. ✅ *(Phase 2)* **Per-tier off switches** in settings, enforced
+   server-side: AI features entirely off (app still works as a local
+   design-data organizer) and datasheet web-fetch off. Crash-reporting-off
+   (default) lands with crash reporting itself in Phase 3.
+3. ⬜ **Research item, do not guess**: Anthropic API data-retention and
    usage terms as they apply to customers with export-controlled or
    ITAR-adjacent designs — whether commercial terms / zero-data-retention
    options cover this, and what Resistance must state about it. BYOK
@@ -235,23 +277,17 @@ Required before any user outside the founding team:
 - **Staying on SQLite**: right call for a desktop app; the "Postgres
   later" note in `.env` applies only to a future hosted version.
 
-## Sequencing
+## Sequencing *(as planned — held up in practice)*
 
-**Step zero, before committing to Phase 1's estimate: a half-day
-throwaway spike.** Boot this repo's standalone Next build inside a bare
-Electron shell and run one Prisma query against a DB in `userData`. The
-plan asserts Next 15 + React 19 + Prisma 6 + Electron compose cleanly —
-they generally do, but it has not been proven on this codebase, and the
-spike is the cheapest way to find out whether "days, not weeks" is
-honest.
+Step zero was a half-day throwaway spike (standalone Next + one Prisma
+query inside a bare Electron shell) — it passed, and Phase 1 landed the
+same day. Phase 2 was the predicted quick wins, plus one surprise the
+plan explicitly hoped to catch: the downgrade guard could only be tested
+once a second migration existed, and it was in fact broken. Phase 4 was
+built directly on Phases 1–2 (folder picker, kicad-cli detection,
+settings) without waiting for Phase 3, as designed. The BYOK-vs-proxy
+decision deadline was met before Phase 2's settings surface was built.
 
-Phase 1 retires the technical risk (standalone Next + Prisma migration
-machinery + local API auth + key storage; days if the spike is clean).
-Phase 2 is quick wins. Phase 3 is grind, not risk (signing bureaucracy +
-the Prisma-asar dance + the compliance disclosure, which can be drafted
-any time and should be drafted early). Phase 4 is a separate feature
-track that depends on Phases 1–2.
-
-One decision deadline: the BYOK-vs-proxy call (Phase 1, item 6) must be
-made before Phase 2 starts — the settings surface and the compliance
-disclosure both change shape depending on the answer.
+Remaining sequence: Phase 3 is grind, not risk — signing bureaucracy
+(blocked on enrollment) + the Prisma-asar dance (not blocked) + the
+compliance research (not blocked, should be drafted early).
