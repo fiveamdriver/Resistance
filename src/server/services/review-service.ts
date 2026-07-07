@@ -30,6 +30,7 @@ import type { ReviewResult } from "@/lib/review-types";
 import { assertProjectExists } from "./project-service";
 import { enrichProjectMpns } from "./datasheet-service";
 import { ingestWebFetchedDatasheets } from "./ingest-service";
+import { getSettings } from "./settings-service";
 
 const DEFAULT_MODEL = "claude-sonnet-4-6";
 const MAX_ROUNDS = 10;
@@ -91,10 +92,17 @@ export async function runReview(
 ): Promise<{ reviewRunId: string; result: ReviewResult }> {
   await assertProjectExists(projectId);
 
+  if (!(await getSettings()).aiEnabled) {
+    throw new AppError(
+      "FEATURE_DISABLED",
+      "AI features are turned off in Settings. Enable them to run a design review."
+    );
+  }
+
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new AppError(
       "PARSE_ERROR",
-      "AI review is not configured: set ANTHROPIC_API_KEY in your environment."
+      "AI review is not configured: add your Anthropic API key in Settings."
     );
   }
 

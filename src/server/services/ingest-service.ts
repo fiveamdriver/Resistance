@@ -20,6 +20,7 @@ import { prisma } from "@/lib/prisma";
 import { resolveStoredPath, saveLibraryFile } from "@/lib/storage";
 
 import { deleteDocumentChunks, indexDocumentFile } from "./document-service";
+import { getSettings } from "./settings-service";
 
 export type IngestProvenance = "design_link" | "web_fetch";
 
@@ -330,6 +331,10 @@ function ingestLimit(): number {
 export async function ingestDesignLinkedDatasheets(
   projectId: string
 ): Promise<IngestResult[]> {
+  // Downloading from datasheet URLs leaks MPNs to third-party sites; the
+  // settings toggle turns all of it off (datasheets come from uploads only).
+  if (!(await getSettings()).datasheetFetchEnabled) return [];
+
   const components = await prisma.component.findMany({
     where: {
       projectId,
@@ -384,6 +389,8 @@ export async function ingestDesignLinkedDatasheets(
 export async function ingestWebFetchedDatasheets(
   projectId: string
 ): Promise<IngestResult[]> {
+  if (!(await getSettings()).datasheetFetchEnabled) return [];
+
   const components = await prisma.component.findMany({
     where: { projectId, mpn: { not: null } },
     select: { mpn: true },

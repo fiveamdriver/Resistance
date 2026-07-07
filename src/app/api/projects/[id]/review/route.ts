@@ -28,7 +28,8 @@ export async function POST(
     return Response.json({ reviewRunId, ...result });
   } catch (error) {
     const { code, message } = toUserError(error);
-    const status = code === "NOT_FOUND" ? 404 : 500;
+    const status =
+      code === "NOT_FOUND" ? 404 : code === "FEATURE_DISABLED" ? 403 : 500;
     return Response.json({ error: message }, { status });
   }
 }

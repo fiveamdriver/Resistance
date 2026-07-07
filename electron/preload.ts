@@ -10,4 +10,9 @@ contextBridge.exposeInMainWorld("resistanceDesktop", {
   /** Stores the key (OS-encrypted) and restarts the backend so it takes effect. */
   setApiKey: (key: string): Promise<void> =>
     ipcRenderer.invoke("settings:set-api-key", key),
+  /** Native directory picker; null when the user cancels. */
+  pickFolder: (): Promise<string | null> =>
+    ipcRenderer.invoke("dialog:pick-folder"),
+  /** Native file picker; null when the user cancels. */
+  pickFile: (): Promise<string | null> => ipcRenderer.invoke("dialog:pick-file"),
 });

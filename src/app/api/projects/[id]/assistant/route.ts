@@ -15,6 +15,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { NextRequest } from "next/server";
 
 import { boardTools, executeBoardTool } from "@/lib/board-tools";
+import { getSettings } from "@/server/services/settings-service";
 
 export const runtime = "nodejs";
 
@@ -98,6 +99,13 @@ export async function POST(
 
   if (!Array.isArray(body?.messages)) {
     return new Response("body.messages must be an array", { status: 400 });
+  }
+
+  if (!(await getSettings()).aiEnabled) {
+    return new Response(
+      "AI features are turned off in Settings. Enable them to use the assistant.",
+      { status: 403 },
+    );
   }
 
   const anthropic = getAnthropicClient();

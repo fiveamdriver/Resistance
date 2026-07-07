@@ -47,6 +47,18 @@ export const updateProjectSchema = z.object({
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 
 /**
+ * PATCH /api/settings body. All fields optional — a partial update. Keys and
+ * defaults are owned by src/server/services/settings-service.ts.
+ */
+export const updateSettingsSchema = z.object({
+  aiEnabled: z.boolean().optional(),
+  datasheetFetchEnabled: z.boolean().optional(),
+  kicadCliPath: z.string().max(1000).nullable().optional(),
+});
+
+export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
+
+/**
  * Validate an uploaded file's metadata (name + size). The actual bytes are
  * streamed to disk by the storage layer; here we gate type and size.
  */

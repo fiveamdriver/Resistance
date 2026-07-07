@@ -59,20 +59,51 @@ function runPrisma(
 }
 
 /**
- * Refuse to touch a database that a NEWER app version migrated forward.
- * `migrate status` reports migrations recorded in the DB but absent from
- * this build's prisma/migrations as "missing from" the local directory.
+ * Refuse to touch a database that a NEWER app version migrated forward:
+ * any migration recorded in the DB's _prisma_migrations ledger that this
+ * build's prisma/migrations directory doesn't contain means the DB is ahead
+ * of the app. (Prisma's own `migrate status` reports "up to date" in this
+ * situation, so the ledger has to be compared directly.)
  */
 export function assertNoDowngrade(repoRoot: string, databaseUrl: string): void {
   const dbPath = databaseUrl.replace(/^file:/, "");
   if (!existsSync(dbPath)) return; // fresh install, nothing to guard
 
-  const { output } = runPrisma(repoRoot, databaseUrl, ["migrate", "status"]);
-  if (/missing from/i.test(output) || /not found locally/i.test(output)) {
+  const res = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "read-migrations.js"), repoRoot],
+    {
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: "1",
+        DATABASE_URL: databaseUrl,
+      },
+      encoding: "utf8",
+      timeout: 60_000,
+    }
+  );
+  if (res.status !== 0) {
+    throw new MigrationError(
+      `Could not read the database's migration history.\n\n${(res.stderr ?? "").trim()}`,
+      null
+    );
+  }
+  const applied = JSON.parse(res.stdout) as string[];
+
+  const local = new Set(
+    readdirSync(path.join(repoRoot, "prisma", "migrations"), {
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+  );
+  const unknown = applied.filter((name) => !local.has(name));
+  if (unknown.length > 0) {
     throw new DowngradeError(
-      "This database was created by a newer version of Resistance and can't " +
-        "be opened by this one. Update Resistance, or restore the " +
-        "pre-migration backup from the backups folder."
+      "This database was created by a newer version of Resistance " +
+        `(it contains ${unknown.join(", ")}) and can't be opened by this one. ` +
+        "Update Resistance, or restore the pre-migration backup from the " +
+        "backups folder."
     );
   }
 }

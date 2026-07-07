@@ -12,15 +12,25 @@
  */
 import { spawn, type ChildProcess } from "child_process";
 import { randomBytes } from "crypto";
-import { mkdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
 import http from "http";
 import net from "net";
 import path from "path";
 
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  nativeImage,
+  session,
+  shell,
+} from "electron";
 
 import { assertNoDowngrade, backupDatabase, migrateDatabase } from "./db";
+import { installAppMenu } from "./menu";
 import { hasApiKey, loadApiKey, saveApiKey } from "./secrets";
+import { loadWindowState, trackWindowState } from "./window-state";
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const DEV_MODE =
@@ -32,6 +42,17 @@ const AUTH_HEADER = "x-resistance-token";
 // (`electron dist/main.js` would otherwise default the name to "Electron").
 app.setName("Resistance");
 app.setPath("userData", path.join(app.getPath("appData"), "Resistance"));
+
+// One instance owns the userData dir (SQLite + per-boot token); a second
+// launch focuses the existing window instead.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+}
+app.on("second-instance", () => {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.focus();
+});
 
 const token = randomBytes(32).toString("hex");
 let serverProc: ChildProcess | null = null;
@@ -137,15 +158,20 @@ function injectAuthHeader(origin: string): void {
   );
 }
 
-function createWindow(): void {
+function createWindow(dataDir: string): void {
+  const state = loadWindowState(dataDir);
   win = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    width: state.width,
+    height: state.height,
+    x: state.x,
+    y: state.y,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
     },
   });
+  if (state.isMaximized) win.maximize();
+  trackWindowState(dataDir, win);
   win.once("ready-to-show", () => win?.show());
 
   // The window is for the local app only; anything else goes to the browser.
@@ -160,7 +186,9 @@ function createWindow(): void {
     }
   });
 
-  void win.loadURL(`${baseUrl}/projects`);
+  // Dev aid: RESISTANCE_START_PATH opens the window on a different page
+  // (pairs with RESISTANCE_SHOT for headless checks of specific screens).
+  void win.loadURL(`${baseUrl}${process.env.RESISTANCE_START_PATH ?? "/projects"}`);
 
   // Dev aid: RESISTANCE_SHOT=<path.png> writes a screenshot after load, so
   // headless checks (and agents) can see what the window actually rendered.
@@ -179,6 +207,32 @@ function createWindow(): void {
 app.whenReady().then(async () => {
   const dataDir = app.getPath("userData");
   mkdirSync(path.join(dataDir, "uploads"), { recursive: true });
+
+  installAppMenu(() => {
+    if (win && baseUrl) void win.loadURL(`${baseUrl}/settings`);
+  });
+
+  // Dev/unpackaged dock icon; packaged builds get theirs from the bundle
+  // (Phase 3 derives .icns/.ico from the same PNG).
+  const iconPath = path.join(__dirname, "..", "assets", "icon.png");
+  if (process.platform === "darwin" && existsSync(iconPath)) {
+    app.dock?.setIcon(nativeImage.createFromPath(iconPath));
+  }
+
+  ipcMain.handle("dialog:pick-folder", async () => {
+    if (!win) return null;
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      properties: ["openDirectory"],
+    });
+    return canceled ? null : (filePaths[0] ?? null);
+  });
+  ipcMain.handle("dialog:pick-file", async () => {
+    if (!win) return null;
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      properties: ["openFile"],
+    });
+    return canceled ? null : (filePaths[0] ?? null);
+  });
 
   ipcMain.handle("settings:has-api-key", () => hasApiKey(dataDir));
   ipcMain.handle("settings:set-api-key", async (_event, key: string) => {
@@ -204,7 +258,7 @@ app.whenReady().then(async () => {
       baseUrl = await startServer(dataDir);
       injectAuthHeader(baseUrl);
     }
-    createWindow();
+    createWindow(dataDir);
   } catch (err) {
     dialog.showErrorBox(
       "Resistance could not start",

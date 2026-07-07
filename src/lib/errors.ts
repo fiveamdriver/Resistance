@@ -14,7 +14,8 @@ export type AppErrorCode =
   | "FILE_TOO_LARGE"
   | "STORAGE_ERROR"
   | "PARSE_ERROR"
-  | "INGEST_ERROR";
+  | "INGEST_ERROR"
+  | "FEATURE_DISABLED";
 
 export class AppError extends Error {
   readonly code: AppErrorCode;

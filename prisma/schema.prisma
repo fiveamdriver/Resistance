@@ -237,6 +237,15 @@ model DatasheetLibrary {
   @@index([mpn])
 }
 
+/// App-wide key-value settings (single-user desktop app, so no per-user rows).
+/// Values are JSON-encoded; typed access goes through
+/// src/server/services/settings-service.ts, which owns keys and defaults.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 /// Global per-MPN datasheet cache. Keyed by MPN only — shared across all projects
 /// so the same part is never fetched or re-parsed twice.
 model MpnCache {

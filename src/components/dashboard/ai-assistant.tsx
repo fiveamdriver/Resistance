@@ -61,7 +61,10 @@ export function AiAssistant({ projectId }: { projectId: string }) {
       });
 
       if (!resp.ok || !resp.body) {
-        throw new Error(`HTTP ${resp.status}`);
+        // The route sends a user-facing explanation (no API key, AI turned
+        // off in Settings, …) as the plain-text body — show it, don't eat it.
+        const detail = resp.ok ? "" : (await resp.text().catch(() => "")).trim();
+        throw new Error(detail || `The assistant request failed (HTTP ${resp.status}).`);
       }
 
       const reader = resp.body.getReader();
@@ -84,13 +87,14 @@ export function AiAssistant({ projectId }: { projectId: string }) {
         ...outgoing,
         { role: "assistant", content: assistantText },
       ];
-    } catch {
+    } catch (err) {
+      const text =
+        err instanceof Error && err.message
+          ? err.message
+          : "Connection error — check the server logs.";
       setMessages((prev) => {
         const updated = [...prev];
-        updated[updated.length - 1] = {
-          role: "assistant",
-          text: "Connection error — check the server logs.",
-        };
+        updated[updated.length - 1] = { role: "assistant", text };
         return updated;
       });
     } finally {

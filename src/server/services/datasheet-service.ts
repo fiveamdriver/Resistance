@@ -17,6 +17,8 @@ import type { WebSearchTool20250305 } from "@anthropic-ai/sdk/resources/messages
 
 import { prisma } from "@/lib/prisma";
 
+import { getSettings } from "./settings-service";
+
 export interface DatasheetSpecs {
   maxVoltageV: number | null;
   maxCurrentA: number | null;
@@ -32,7 +34,9 @@ export interface DatasheetSpecs {
 
 function makeClient(): Anthropic {
   if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not set");
+    throw new Error(
+      "Datasheet lookup is not configured: add your Anthropic API key in Settings."
+    );
   }
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 }
@@ -113,6 +117,11 @@ Return only the JSON object, no other text.`;
  * Returns the cache row after completion.
  */
 export async function enrichMpn(mpn: string): Promise<void> {
+  // Enrichment sends the MPN to the Anthropic API and performs hosted web
+  // searches — both settings toggles must allow it.
+  const { aiEnabled, datasheetFetchEnabled } = await getSettings();
+  if (!aiEnabled || !datasheetFetchEnabled) return;
+
   // Skip if already complete
   const existing = await prisma.mpnCache.findUnique({ where: { mpn } });
   if (existing?.status === "complete") return;

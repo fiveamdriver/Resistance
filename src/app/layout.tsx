@@ -34,6 +34,12 @@ export default function RootLayout({
                 Projects
               </Link>
               <Link
+                href="/settings"
+                className="text-[#4a5568] transition-colors hover:text-[#94a3b8]"
+              >
+                Settings
+              </Link>
+              <Link
                 href="/projects/new"
                 className="rounded border border-[rgba(255,255,255,0.15)] px-4 py-1.5 bg-[#F5F0E8] text-black transition-colors hover:border-[rgba(255,255,255,0.3)] hover:text-black"
               >
