@@ -15,7 +15,8 @@ export type AppErrorCode =
   | "STORAGE_ERROR"
   | "PARSE_ERROR"
   | "INGEST_ERROR"
-  | "FEATURE_DISABLED";
+  | "FEATURE_DISABLED"
+  | "REVIEW_IN_PROGRESS";
 
 export class AppError extends Error {
   readonly code: AppErrorCode;

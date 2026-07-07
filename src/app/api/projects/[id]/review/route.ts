@@ -29,7 +29,13 @@ export async function POST(
   } catch (error) {
     const { code, message } = toUserError(error);
     const status =
-      code === "NOT_FOUND" ? 404 : code === "FEATURE_DISABLED" ? 403 : 500;
+      code === "NOT_FOUND"
+        ? 404
+        : code === "FEATURE_DISABLED"
+          ? 403
+          : code === "REVIEW_IN_PROGRESS"
+            ? 409
+            : 500;
     return Response.json({ error: message }, { status });
   }
 }
