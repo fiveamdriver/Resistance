@@ -19,6 +19,7 @@ import { extractPdfPages } from "@/lib/parsers/pdfParser";
 import { prisma } from "@/lib/prisma";
 import { resolveStoredPath, saveLibraryFile } from "@/lib/storage";
 
+import { refineSpecsFromVerifiedPdf } from "./datasheet-service";
 import { deleteDocumentChunks, indexDocumentFile } from "./document-service";
 import { getSettings } from "./settings-service";
 
@@ -299,6 +300,12 @@ export async function ingestRemotePdf(req: IngestRequest): Promise<IngestResult>
       where: { id: record.id },
       data: { parseStatus: "parsed" },
     });
+
+    // The verified text is now on file — upgrade the MPN's cached specs from
+    // web-search numbers to page-cited values extracted from this document
+    // (audit #2). Fire-and-forget; refinement never throws.
+    void refineSpecsFromVerifiedPdf(mpn);
+
     return {
       status: "verified",
       fileId: record.id,
@@ -469,5 +476,10 @@ export async function approveQuarantinedFile(fileId: string): Promise<{ chunkCou
     where: { id: fileId },
     data: { verifyStatus: "verified", parseStatus: "parsed", parseError: null },
   });
+
+  // Newly human-approved datasheet text: upgrade the MPN's cached specs to
+  // page-cited values from this document (audit #2). Fire-and-forget.
+  if (file.mpn) void refineSpecsFromVerifiedPdf(file.mpn);
+
   return result;
 }
