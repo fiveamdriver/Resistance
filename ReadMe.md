@@ -1,56 +1,49 @@
 # ⚡ Resistance — AI-Powered Electrical Engineering Project Assistant
 
-Resistance is a web app for electrical/hardware engineers. Upload your Altium
-project exports — **netlists, BOMs, schematic PDFs, datasheets, and requirements
-documents** — and Resistance turns them into a searchable project knowledge
-base, a connectivity graph, and (eventually) an AI assistant that can answer
-questions like:
+Resistance is a local-first assistant for electrical/hardware engineers. Link a
+KiCad project folder (or upload Altium/KiCad exports — netlists, BOMs,
+schematic PDFs, datasheets, requirements docs) and Resistance turns them into a
+queryable design database, an interactive connectivity graph, and an AI
+assistant + design reviewer whose answers are grounded in your actual board:
 
-- What connects to **U7**?
-- What components are on the **5V** rail?
-- What nets connect to this IC?
-- Which BOM rows match this component?
-- Which datasheets belong to these parts?
-- What design-review risks should a human engineer check?
+- What connects to **U7**? What's on the **5V** rail?
+- Where is **C3** placed, and what's near it on the board?
+- Does anything exceed its datasheet's absolute maximums?
+- What design-review risks should a human engineer check before spinning?
 
-> **Status: Phase 1 (MVP foundation).** This is a working skeleton: project
-> creation, file upload, file organization, and clean placeholder interfaces for
-> the netlist/BOM/PDF parsers and the AI agent. Parsers currently return
-> mock/sample data; no LLM is wired up yet.
->
 > The quality bar for this project lives in
 > [`docs/ENGINEERING_STANDARDS.md`](./docs/ENGINEERING_STANDARDS.md).
+> CI enforces typecheck + lint + tests on every push.
 
 ---
 
-## Phase 1 scope
+## What's real today
 
-| Area              | Included in Phase 1                                               |
-| ----------------- | ----------------------------------------------------------------- |
-| Projects          | Create projects, list them, open a project dashboard              |
-| File upload       | Local upload to `/uploads`, isolated per project, type/size gated |
-| File organization | Files table with category, size, parse status, upload date        |
-| Data model        | Full Prisma schema for the connectivity + BOM + RAG domains       |
-| Parsers           | `parseNetlist` / `parseBom` / `parsePdf` / `chunkDocument` stubs  |
-| Connectivity      | Typed graph model + search ("nets for U7", "components on 5V")    |
-| AI assistant      | Chat UI with **canned** responses (no LLM)                        |
-| Reports           | Project summary + placeholder for the design-review generator     |
+| Area | Status |
+| --- | --- |
+| **Parsers** | Altium Protel `.net`, KiCad S-expression `.net` (auto-detected), KiCad `.kicad_pcb` layout (placements, board dims, copper stackup, zones), Altium binary validation, BOM CSV with tolerant header mapping |
+| **KiCad integration** | Link a KiCad folder in-app: import, one-click sync, optional file-watcher auto-sync. Sync is authoritative — parts deleted in KiCad are reconciled out of the database (guarded against partial parses). Plus a standalone [KiCad MCP server](./packages/kicad-mcp) (DRC/ERC/render/BOM/netlist via kicad-cli) |
+| **AI assistant** | Streams from the Anthropic API with a multi-round tool loop: schematic tools (nets, components, search), EE-graph tools (topology, net/component analysis), and physical-layout tools (dimensions, placement, proximity) |
+| **AI design review** | Multi-round tool loop with EE calculators and datasheet-grounded compliance checks; findings persist as review runs |
+| **Datasheets** | Automatic ingestion with a verification gate (magic bytes, size cap, MPN-in-document check, quarantine), global content-hash library, MPN→specs enrichment, FTS5 full-text search |
+| **Connectivity graph** | Interactive React Flow bipartite graph (components ↔ nets) with click-to-trace |
+| **Desktop** | Electron shell with native menus, settings, and server-side privacy gates (AI calls and datasheet fetching can each be disabled) |
 
-What Phase 1 deliberately does **not** do yet: real Altium parsing, real BOM
-parsing, PDF text extraction/RAG, LLM calls, and graph visualization. Each has a
-clearly marked seam (see [Architecture](#architecture)).
+Not built yet: semantic/embedding RAG (search is FTS5 keyword-only — roadmap in
+`docs/EMBEDDINGS_FOR_RAG.md`), PCB track/routing extraction, multi-user auth.
 
 ---
 
 ## Tech stack
 
-- **Next.js (App Router) + TypeScript** — UI and server actions / route handlers
-- **Tailwind CSS** — styling
-- **Prisma** — ORM
-- **SQLite** for local dev (schema is **PostgreSQL-compatible** — see below)
-- **Zod** — input/validation schemas
-- **Vitest** — unit tests
-- **ESLint + Prettier** — linting and formatting
+- **Next.js (App Router) + TypeScript (strict, zero `any`)** — UI, server
+  actions, REST routes
+- **Prisma + SQLite** — local dev; schema is PostgreSQL-compatible by design
+- **Anthropic SDK** — assistant, design review, datasheet enrichment
+- **React Flow** (`@xyflow/react`) — connectivity graph
+- **Tailwind CSS**, **Zod**, **Vitest**, **ESLint + Prettier**
+- **Electron** — desktop shell (`electron/`)
+- **Python FastMCP + kiutils** — KiCad MCP server (`packages/kicad-mcp`)
 
 ---
 
@@ -58,8 +51,12 @@ clearly marked seam (see [Architecture](#architecture)).
 
 ### Prerequisites
 
-- Node.js 18.18+ (developed on Node 20+)
+- Node.js 24 (LTS)
 - npm
+- Optional: [KiCad](https://kicad.org) 8+ with `kicad-cli` on PATH — enables
+  in-app folder sync exports, DRC/ERC, and board rendering
+- Optional: an Anthropic API key — enables the AI assistant, design review,
+  and datasheet enrichment (everything else works without it)
 
 ### Setup
 
@@ -69,18 +66,18 @@ npm install
 
 # 2. Create the SQLite database, apply the schema, and seed demo data
 npm run setup
-#   ≡ prisma generate && prisma db push && npm run db:seed
 
 # 3. Start the dev server
 npm run dev
 ```
 
-Open <http://localhost:3000>. The seed creates a **"Demo Power Board"** project
-with mock components, nets, and BOM rows so every tab shows real data.
+Open <http://localhost:3000>. The seed creates a demo project so every tab has
+data. To use the AI features, add `ANTHROPIC_API_KEY` to `.env.local` or via
+the in-app Settings page.
 
 ### Environment
 
-Configuration lives in `.env` (committed with safe local defaults — no secrets):
+`.env` is committed with safe local defaults (no secrets):
 
 ```bash
 DATABASE_URL="file:./dev.db"   # SQLite for local dev
@@ -89,130 +86,96 @@ UPLOADS_DIR="uploads"          # local file storage directory
 
 ### Useful scripts
 
-| Script               | What it does                            |
-| -------------------- | --------------------------------------- |
-| `npm run dev`        | Start the dev server                    |
-| `npm run build`      | Production build                        |
-| `npm test`           | Run the unit test suite (Vitest)        |
-| `npm run test:watch` | Run tests in watch mode                 |
-| `npm run lint`       | ESLint                                  |
-| `npm run format`     | Prettier (write)                        |
-| `npm run typecheck`  | `tsc --noEmit`                          |
-| `npm run db:push`    | Apply the Prisma schema to the database |
-| `npm run db:seed`    | Seed demo/mock data                     |
-| `npm run db:reset`   | Reset the DB and re-seed                |
-| `npm run db:studio`  | Open Prisma Studio                      |
+| Script | What it does |
+| --- | --- |
+| `npm run dev` | Start the dev server |
+| `npm run desktop` | Build and run the Electron desktop app |
+| `npm run dev:desktop` | Electron shell against the dev server |
+| `npm test` | Unit suite + DB-backed integration suite |
+| `npm run test:unit` | Pure unit tests only (fast) |
+| `npm run test:db` | DB-backed tests (throwaway SQLite per file) |
+| `npm run typecheck` | `tsc --noEmit` for app + electron |
+| `npm run lint` / `npm run format` | ESLint / Prettier |
+| `npm run db:push` / `db:seed` / `db:reset` / `db:studio` | Prisma database tasks |
+| `npm run review:dry-run` | Exercise the design-review pipeline from the CLI |
 
 ---
 
 ## Supported file types
 
-Validated on upload (type + 25 MB size limit), then stored per-project under a
-server-generated filename:
+Validated on upload (type + size gated), stored per-project under
+server-generated names:
 
-| Category   | Extensions             | Purpose                     |
-| ---------- | ---------------------- | --------------------------- |
-| `netlist`  | `.net`                 | Altium netlist exports      |
-| `bom`      | `.csv`, `.xlsx`        | Bill of Materials           |
-| `pdf`      | `.pdf`                 | Datasheets, schematic PDFs  |
-| `document` | `.md`, `.txt`, `.docx` | Requirements / general docs |
+| Category | Extensions | Purpose |
+| --- | --- | --- |
+| `netlist` | `.net` | Altium Protel or KiCad S-expression (auto-detected) |
+| `bom` | `.csv`, `.xlsx` | Bill of Materials |
+| `altium` | `.SchDoc`, `.PcbDoc` | Altium binaries (validated, stored) |
+| `pdf` | `.pdf` | Datasheets, schematic PDFs — text-extracted + indexed |
+| `document` | `.md`, `.txt`, `.docx` | Requirements / general docs — indexed |
 
-Sample/mock files for testing live in [`sample-files/`](./sample-files).
+KiCad design files (`.kicad_sch`, `.kicad_pcb`, …) aren't uploaded directly —
+link the project folder instead and Resistance exports/parses via kicad-cli.
 
 ---
 
 ## Architecture
 
-Separation of concerns is the organizing principle — UI, business logic, data
-access, parsing, and AI logic are kept apart.
+UI, business logic, data access, parsing, and AI logic are kept apart:
 
 ```
 src/
   app/                      # Next.js routes — thin UI + server actions only
-    page.tsx                #   Home
-    projects/               #   List, create (server action), dashboard
-    api/projects/route.ts   #   REST surface (JSON) for future clients
+    api/projects/[id]/      #   REST: upload, assistant, review, folder-import…
   components/               # Presentational + small client components
-    dashboard/              #   Tabs, upload, tables, connectivity, AI chat
-    projects/, ui/          #   Forms and shared primitives
-  server/services/          # Business logic — the ONLY place that queries Prisma
-    project-service.ts
-    file-service.ts         #   validate -> store -> record upload pipeline
-    connectivity-service.ts #   builds the ConnectivityGraph from the DB
-  lib/                      # Cross-cutting helpers
-    prisma.ts, storage.ts   #   data access + local file storage
-    fileTypes.ts, validation.ts, errors.ts, format.ts
-    ai/canned-assistant.ts  #   placeholder assistant routing (no LLM)
-  parsers/                  # parseNetlist / parseBom / parsePdf / chunkDocument
-  types/connectivity.ts     # ComponentNode / NetNode / PinConnection / Graph
-prisma/                     # schema.prisma + seed.ts
-sample-files/               # mock netlist / BOM / requirements
-uploads/                    # local file storage (gitignored)
+  server/
+    services/               # Business logic — the only place that queries Prisma
+      file-service.ts       #   validate → store → parse → status pipeline
+      folder-sync-service.ts#   KiCad folder scan/import/sync + reconciliation
+      review-service.ts     #   AI design-review runs
+      datasheet-service.ts  #   MPN → specs enrichment (cached)
+      ingest-service.ts     #   datasheet download + verification gate
+    eda/                    # EDA-tool adapter (KiCad detection + exports)
+  lib/
+    parsers/                # netlist / KiCad netlist / .kicad_pcb / BOM / Altium
+    board-tools.ts,
+    ee-assistant-tools.ts   # AI tool definitions + executors
+    ee-graph-queries.ts,
+    ee-graph-semantics.ts   # pure connectivity analysis (tested)
+electron/                   # desktop shell (spawns the standalone Next server)
+packages/kicad-mcp/         # Python MCP server for KiCad (13 tools)
+prisma/                     # schema + migrations + seed
 ```
 
-### Data model (Prisma)
-
-```
-User 1─* Project 1─* ProjectFile
-                  1─* Component 1─* Pin 1─1 Connection *─1 Net
-                  1─* Net
-                  1─* BomItem *─* Component
-                  1─* DocumentChunk
-```
-
-- A **Pin** connects to exactly one **Net** (enforced by a unique `pinId` on
-  `Connection`); a **Net** has many connections.
-- A **BomItem** can reference one or more **Components** (many-to-many).
-- **DocumentChunk** stores chunked text + an optional embedding for future RAG.
-- No enums and no SQLite-only types → moving to PostgreSQL is a two-line change
-  (`provider` + `DATABASE_URL`).
-
-### Extension seams (how to make this real later)
-
-- **Replace mock parsers:** implement the bodies of `src/parsers/*` — the return
-  types and `dispatchParse()` router already match what the pipeline expects.
-- **Plug in an LLM:** swap `lib/ai/canned-assistant.ts` for a real agent runtime;
-  the future tool names (`search_component`, `search_net`,
-  `get_connected_components`, …) are already defined.
-- **Add graph visualization:** `connectivity-service.ts` already produces a
-  `ConnectivityGraph`; render it with React Flow in the Connectivity tab.
+**Write-layer contract:** parser DB writes are batched and transactional. A
+crash mid-parse rolls back; a re-parse converges; parses never blank fields
+they didn't produce. Sync-provenance parses prune stale nets/pins, and folder
+sync reconciles deleted components (netlist ∪ layout, with a shrink guard so a
+partial parse can never mass-delete a design). These contracts are pinned by
+`src/lib/parsers/*.db.test.ts`.
 
 ---
 
 ## Testing
 
 ```bash
-npm test
+npm test          # everything
+npm run test:unit # pure logic only (sub-second)
+npm run test:db   # DB-backed characterization + reconciliation tests
 ```
 
-Unit tests cover the pure, high-value logic: file-type detection, Zod
-validation + size/type gating, byte formatting, parser interface shapes, the
-connectivity graph transforms, and the canned-assistant routing. Tests use mock
-data only.
+The DB suite provisions a throwaway SQLite database per test file
+(`src/test/db-setup.ts`) — no shared state, safe in parallel, runs in CI.
 
 ---
 
-## Security notes (Phase 1)
+## Security & privacy notes
 
-- Uploaded files are validated by **type and size** (25 MB) via Zod before any
-  disk write.
-- User filenames are **never trusted**: files are stored under a server-generated
-  UUID name, isolated in a per-project subdirectory.
-- `resolveStoredPath` guards against **path traversal** outside the uploads root.
-- No secrets in code; `.env` holds only safe local defaults.
-- Sample/mock data only — no proprietary or confidential data.
-
----
-
-## Roadmap (future phases)
-
-- [ ] **Altium netlist parser** — real Protel `.NET` parsing → Components / Nets / Pins / Connections
-- [ ] **BOM parser** — CSV/XLSX parsing, header normalization, refdes expansion, component matching
-- [ ] **PDF parsing & RAG** — text extraction, chunking, embeddings, retrieval over datasheets/requirements
-- [ ] **Connectivity graph** — interactive React Flow visualization
-- [ ] **AI assistant tools** — LLM-backed agent with `search_component` / `search_net` / `get_connected_components` / `match_bom_rows` / `find_datasheets`
-- [ ] **Design-review report generator** — automated risk flags for human review
-
-```
-
-```
+- Local-first: your design data stays in a local SQLite DB and local uploads
+  directory. AI and datasheet fetching are opt-out via Settings and enforced
+  server-side.
+- Uploaded filenames are never trusted; files are stored under generated names
+  with path-traversal guards at both storage seams.
+- Fetched datasheets pass a verification gate (magic bytes, size cap, MPN
+  match) or are quarantined pending human approval.
+- Electron DB migrations take a timestamped backup first and refuse downgrades.
