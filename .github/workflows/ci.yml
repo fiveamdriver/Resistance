@@ -1,0 +1,42 @@
+# Resistance CI — the enforcement gate the audit called for (finding #4).
+#
+# Runs the exact checks developers run locally (typecheck, lint, test), so a
+# green local run means a green CI run. The Next.js production build still
+# skips its in-build lint/type phase (Node 26 worker deadlock — see
+# next.config.ts); this workflow is what makes those checks mandatory.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    env:
+      # Tests that touch a database use a throwaway SQLite file.
+      DATABASE_URL: "file:./ci.db"
+      UPLOADS_DIR: "uploads"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Match local development (Node 24 LTS). Node 26 deadlocks the Next
+          # build's lint worker — do not bump past 24 without re-testing that.
+          node-version: 24
+          cache: npm
+
+      # postinstall runs `prisma generate`, so the client exists after this.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (app + electron)
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test

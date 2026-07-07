@@ -6,6 +6,9 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // DB-backed integration tests run separately (vitest.db.config.ts) so
+    // this suite stays pure and instant.
+    exclude: ["**/node_modules/**", "**/*.db.test.ts"],
   },
   resolve: {
     // Mirror the "@/*" alias from tsconfig so tests import the same way as app code.
