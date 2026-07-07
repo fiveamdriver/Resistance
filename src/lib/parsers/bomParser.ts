@@ -13,6 +13,7 @@ import "server-only";
 import { readFile } from "fs/promises";
 
 import Papa from "papaparse";
+import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/errors";
@@ -159,10 +160,29 @@ function parseQuantity(raw: string | null): number {
 // DB upserts
 // ---------------------------------------------------------------------------
 
+export interface BomParseOptions {
+  /**
+   * ProjectFile id of the BOM being parsed. Each file owns its rows: matching
+   * scopes to this file (legacy fileId-null rows are adopted), and rows this
+   * file previously produced but no longer contains are deleted after the
+   * parse (audit #3 — overlapping BOM sources).
+   */
+  fileId?: string;
+  /**
+   * True for kicad_sync exports — a fresh design export outranks whatever is
+   * on the Component. Non-authoritative BOMs (loose CSV uploads) only fill
+   * empty fields; a conflicting MPN is logged and skipped rather than
+   * silently rewriting what drives datasheet fetching.
+   */
+  authoritative?: boolean;
+}
+
 async function upsertBomRow(
+  db: Prisma.TransactionClient,
   projectId: string,
   cols: ColumnMap,
-  row: string[]
+  row: string[],
+  opts: BomParseOptions
 ): Promise<{ linkedRefs: string[]; unlinkedRefs: string[] }> {
   const refDesRaw = cell(row, cols.refDes);
   const description = cell(row, cols.description);
@@ -176,28 +196,40 @@ async function upsertBomRow(
   const individualRefs = expandRefDes(refDesRaw);
   const linkedRefs: string[] = [];
   const unlinkedRefs: string[] = [];
-  const componentIds: { id: string }[] = [];
+  const linked: { id: string; refDes: string; mpn: string | null; datasheetUrl: string | null }[] =
+    [];
 
   for (const ref of individualRefs) {
-    const comp = await prisma.component.findUnique({
+    const comp = await db.component.findUnique({
       where: { projectId_refDes: { projectId, refDes: ref } },
-      select: { id: true },
+      select: { id: true, refDes: true, mpn: true, datasheetUrl: true },
     });
     if (comp) {
-      componentIds.push({ id: comp.id });
+      linked.push(comp);
       linkedRefs.push(ref);
     } else {
       unlinkedRefs.push(ref);
     }
   }
+  const componentIds = linked.map((c) => ({ id: c.id }));
 
-  // Upsert: find an existing BomItem with the same refDesRaw for this project
-  // (BomItem has no unique constraint, so we can't use Prisma's native upsert)
-  const existing = await prisma.bomItem.findFirst({
-    where: { projectId, refDesRaw: refDesRaw },
+  // Upsert: find an existing BomItem with the same refDesRaw for this project.
+  // When this parse carries a fileId, prefer this file's own row and fall back
+  // to adopting a legacy fileId-null row (BomItem has no unique constraint, so
+  // no native upsert). SQLite sorts NULL smallest, so desc puts own-file first.
+  const existing = await db.bomItem.findFirst({
+    where: opts.fileId
+      ? {
+          projectId,
+          refDesRaw,
+          OR: [{ fileId: opts.fileId }, { fileId: null }],
+        }
+      : { projectId, refDesRaw },
+    orderBy: { fileId: "desc" },
   });
 
   const data = {
+    fileId: opts.fileId ?? existing?.fileId ?? null,
     description,
     manufacturer,
     mpn,
@@ -211,11 +243,12 @@ async function upsertBomRow(
   };
 
   if (existing) {
-    await prisma.bomItem.update({ where: { id: existing.id }, data });
+    await db.bomItem.update({ where: { id: existing.id }, data });
   } else {
-    await prisma.bomItem.create({
+    await db.bomItem.create({
       data: {
         projectId,
+        fileId: opts.fileId ?? null,
         refDesRaw,
         description,
         manufacturer,
@@ -228,21 +261,43 @@ async function upsertBomRow(
     });
   }
 
-  // BOM is authoritative for MPN — write it back to each linked Component so
-  // the datasheet enrichment pipeline can find it without a join. Same for the
-  // Datasheet URL (KiCad stock field, carried through the MCP sync CSV), which
-  // drives tier-2 design_link ingestion.
+  // Write MPN / Datasheet URL back to each linked Component so the datasheet
+  // enrichment pipeline can find them without a join. Authoritative (sync)
+  // BOMs overwrite; loose uploads only fill blanks and log conflicts.
   const datasheetRaw = cell(row, cols.datasheet);
   const datasheetUrl =
     datasheetRaw && /^https?:\/\//i.test(datasheetRaw) ? datasheetRaw : null;
-  if ((mpn || datasheetUrl) && componentIds.length > 0) {
-    await prisma.component.updateMany({
-      where: { id: { in: componentIds.map((c) => c.id) } },
-      data: {
-        ...(mpn ? { mpn } : {}),
-        ...(datasheetUrl ? { datasheetUrl } : {}),
-      },
-    });
+  if ((mpn || datasheetUrl) && linked.length > 0) {
+    const mpnIds: string[] = [];
+    const urlIds: string[] = [];
+    for (const comp of linked) {
+      if (mpn && comp.mpn !== mpn) {
+        if (opts.authoritative || comp.mpn == null) {
+          mpnIds.push(comp.id);
+        } else {
+          console.warn(
+            `[bom] MPN conflict on ${comp.refDes}: keeping "${comp.mpn}", ignoring "${mpn}" from non-authoritative BOM`
+          );
+        }
+      }
+      if (datasheetUrl && comp.datasheetUrl !== datasheetUrl) {
+        if (opts.authoritative || comp.datasheetUrl == null) {
+          urlIds.push(comp.id);
+        }
+      }
+    }
+    if (mpn && mpnIds.length > 0) {
+      await db.component.updateMany({
+        where: { id: { in: mpnIds } },
+        data: { mpn },
+      });
+    }
+    if (datasheetUrl && urlIds.length > 0) {
+      await db.component.updateMany({
+        where: { id: { in: urlIds } },
+        data: { datasheetUrl },
+      });
+    }
   }
 
   return { linkedRefs, unlinkedRefs };
@@ -253,12 +308,28 @@ async function upsertBomRow(
 // ---------------------------------------------------------------------------
 
 /**
+ * A pick-and-place / CPL export looks BOM-ish (Designator, Footprint…) but
+ * describes placement, not the bill of materials — importing one as a BOM
+ * corrupts quantities and can rewrite Component MPNs (audit #3). Position
+ * columns + a rotation column together are the tell.
+ */
+function looksLikePickAndPlace(headers: string[]): boolean {
+  const norm = headers.map((h) => h.trim().toLowerCase());
+  const hasPositionCol = norm.some((h) =>
+    /^(mid|pos|ref|pad|center)\s*[_-]?\s*x$/.test(h)
+  );
+  const hasRotationCol = norm.some((h) => /^rot(ation)?$/.test(h));
+  return hasPositionCol && hasRotationCol;
+}
+
+/**
  * Parse an Altium BOM CSV export and upsert the rows into the project.
  * Returns a summary of what was written and which refdes had no matching component.
  */
 export async function parseBomFile(
   projectId: string,
-  filePath: string
+  filePath: string,
+  opts: BomParseOptions = {}
 ): Promise<BomParseSummary> {
   let csvText: string;
   try {
@@ -289,6 +360,14 @@ export async function parseBomFile(
   }
 
   const headers = rows[0].map((h) => h.trim());
+
+  if (looksLikePickAndPlace(headers)) {
+    throw new AppError(
+      "PARSE_ERROR",
+      "This looks like a pick-and-place / CPL export (position + rotation columns), not a BOM. It was not imported."
+    );
+  }
+
   const cols = buildColumnMap(headers);
 
   if (cols.refDes === -1 && cols.description === -1) {
@@ -300,22 +379,57 @@ export async function parseBomFile(
   }
 
   const dataRows = rows.slice(1);
-  let linkedComponentCount = 0;
-  const allUnlinked: string[] = [];
 
-  for (const row of dataRows) {
-    // Skip rows that are entirely blank (papaparse sometimes emits them)
-    if (row.every((c) => !c.trim())) continue;
+  // Transactional (audit #5): a crash mid-parse rolls back instead of leaving
+  // half a BOM as ground truth.
+  return prisma.$transaction(
+    async (tx) => {
+      let linkedComponentCount = 0;
+      const allUnlinked: string[] = [];
+      const freshRefDesRaw = new Set<string>();
 
-    const { linkedRefs, unlinkedRefs } = await upsertBomRow(projectId, cols, row);
-    if (linkedRefs.length > 0) linkedComponentCount++;
-    allUnlinked.push(...unlinkedRefs);
-  }
+      for (const row of dataRows) {
+        // Skip rows that are entirely blank (papaparse sometimes emits them)
+        if (row.every((c) => !c.trim())) continue;
 
-  return {
-    rowCount: dataRows.length,
-    linkedComponentCount,
-    // Deduplicate across rows in case the same refdes appears more than once
-    unlinkedRefDes: [...new Set(allUnlinked)],
-  };
+        const raw = cell(row, cols.refDes);
+        if (raw) freshRefDesRaw.add(raw);
+        const { linkedRefs, unlinkedRefs } = await upsertBomRow(
+          tx,
+          projectId,
+          cols,
+          row,
+          opts
+        );
+        if (linkedRefs.length > 0) linkedComponentCount++;
+        allUnlinked.push(...unlinkedRefs);
+      }
+
+      // Per-file supersede: rows this file produced on an earlier parse but
+      // that are gone from the file now are stale. Scoped strictly to this
+      // file's rows — other BOM sources are untouched.
+      if (opts.fileId) {
+        const mine = await tx.bomItem.findMany({
+          where: { projectId, fileId: opts.fileId },
+          select: { id: true, refDesRaw: true },
+        });
+        const staleIds = mine
+          .filter((r) => r.refDesRaw != null && !freshRefDesRaw.has(r.refDesRaw))
+          .map((r) => r.id);
+        for (let i = 0; i < staleIds.length; i += 200) {
+          await tx.bomItem.deleteMany({
+            where: { id: { in: staleIds.slice(i, i + 200) } },
+          });
+        }
+      }
+
+      return {
+        rowCount: dataRows.length,
+        linkedComponentCount,
+        // Deduplicate across rows in case the same refdes appears more than once
+        unlinkedRefDes: [...new Set(allUnlinked)],
+      };
+    },
+    { timeout: 60_000, maxWait: 10_000 }
+  );
 }

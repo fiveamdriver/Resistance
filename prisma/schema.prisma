@@ -102,6 +102,7 @@ model ProjectFile {
 
   project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   documentChunks DocumentChunk[]
+  bomItems       BomItem[]
 
   @@index([projectId])
 }
@@ -200,6 +201,11 @@ model Connection {
 model BomItem {
   id           String  @id @default(cuid())
   projectId    String
+  // Source BOM file (audit #3: overlapping BOM sources). Each file owns its
+  // rows — a re-parse supersedes only rows with the same fileId, and deleting
+  // the file cascades its rows away. Null on legacy rows; the next parse of a
+  // matching refDesRaw adopts them.
+  fileId       String?
   refDesRaw    String? // raw refdes cell from the BOM, e.g. "R1, R2, R3"
   description  String?
   manufacturer String?
@@ -208,10 +214,12 @@ model BomItem {
   footprint    String?
   quantity     Int     @default(1)
 
-  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  components Component[] // many-to-many
+  project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  file       ProjectFile? @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  components Component[]  // many-to-many
 
   @@index([projectId])
+  @@index([fileId])
 }
 
 /// A chunk of a document, ready for future RAG embedding/retrieval.
@@ -241,7 +249,9 @@ model DocumentChunk {
 model ReviewRun {
   id        String   @id @default(cuid())
   projectId String
-  // Lifecycle: "completed" | "failed"
+  // Lifecycle: "running" | "completed" | "failed". One live "running" row per
+  // project (enforced in review-service); stale running rows are reaped as
+  // failed on the next start attempt.
   status    String   @default("completed")
   model     String // LLM model id used, e.g. "claude-sonnet-4-6"
   summary   String? // short natural-language overview produced by the reviewer

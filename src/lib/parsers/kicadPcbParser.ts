@@ -53,6 +53,12 @@ export interface PcbLayoutSummary {
   widthMm: number | null;
   heightMm: number | null;
   zoneCount: number;
+  /**
+   * Every refdes placed on the board. The folder-sync reconciliation pass
+   * uses this as the layout half of the "what still exists" union, so
+   * layout-only parts (fiducials, mounting holes) survive netlist reconcile.
+   */
+  placedRefDes: string[];
 }
 
 /** The footprint's own placement: the first `(at x y [rot])` in the block. */
@@ -176,43 +182,80 @@ export async function persistPcbLayout(
   layout: PcbLayout,
   sourceFile: string
 ): Promise<PcbLayoutSummary> {
-  for (const p of layout.placements) {
-    await prisma.component.upsert({
-      where: { projectId_refDes: { projectId, refDes: p.refDes } },
-      update: { posX: p.x, posY: p.y, rotation: p.rotation, layer: p.layer },
-      create: {
-        projectId,
-        refDes: p.refDes,
-        posX: p.x,
-        posY: p.y,
-        rotation: p.rotation,
-        layer: p.layer,
-      },
-    });
-  }
+  // Batched + transactional (audit #5): one read, createMany for new
+  // placement-only components, targeted updates only where a value changed.
+  await prisma.$transaction(
+    async (tx) => {
+      const existing = await tx.component.findMany({
+        where: { projectId },
+        select: {
+          id: true,
+          refDes: true,
+          posX: true,
+          posY: true,
+          rotation: true,
+          layer: true,
+        },
+      });
+      const byRefDes = new Map(existing.map((c) => [c.refDes, c]));
+
+      const toCreate = layout.placements.filter((p) => !byRefDes.has(p.refDes));
+      if (toCreate.length > 0) {
+        await tx.component.createMany({
+          data: toCreate.map((p) => ({
+            projectId,
+            refDes: p.refDes,
+            posX: p.x,
+            posY: p.y,
+            rotation: p.rotation,
+            layer: p.layer,
+          })),
+        });
+      }
+
+      for (const p of layout.placements) {
+        const current = byRefDes.get(p.refDes);
+        if (!current) continue;
+        if (
+          current.posX !== p.x ||
+          current.posY !== p.y ||
+          current.rotation !== p.rotation ||
+          current.layer !== p.layer
+        ) {
+          await tx.component.update({
+            where: { id: current.id },
+            data: { posX: p.x, posY: p.y, rotation: p.rotation, layer: p.layer },
+          });
+        }
+      }
+
+      const { board } = layout;
+      const data = {
+        widthMm: board.widthMm,
+        heightMm: board.heightMm,
+        layerCount: board.layerCount,
+        copperLayers: JSON.stringify(board.copperLayers),
+        zones: JSON.stringify(board.zones),
+        sourceFile,
+        parsedAt: new Date(),
+      };
+      await tx.board.upsert({
+        where: { projectId },
+        update: data,
+        create: { projectId, ...data },
+      });
+    },
+    { timeout: 60_000, maxWait: 10_000 }
+  );
 
   const { board } = layout;
-  const data = {
-    widthMm: board.widthMm,
-    heightMm: board.heightMm,
-    layerCount: board.layerCount,
-    copperLayers: JSON.stringify(board.copperLayers),
-    zones: JSON.stringify(board.zones),
-    sourceFile,
-    parsedAt: new Date(),
-  };
-  await prisma.board.upsert({
-    where: { projectId },
-    update: data,
-    create: { projectId, ...data },
-  });
-
   return {
     placedCount: layout.placements.length,
     layerCount: board.layerCount,
     widthMm: board.widthMm,
     heightMm: board.heightMm,
     zoneCount: board.zones.length,
+    placedRefDes: [...new Set(layout.placements.map((p) => p.refDes))],
   };
 }
 

@@ -30,6 +30,24 @@ describe("categorizeFile", () => {
   it("returns 'other' for unknown extensions", () => {
     expect(categorizeFile("image.png")).toBe("other");
   });
+
+  it("does not categorize pick-and-place / CPL exports as BOM", () => {
+    // KiCad position exports
+    expect(categorizeFile("myboard-all-pos.csv")).toBe("other");
+    expect(categorizeFile("myboard-top-pos.csv")).toBe("other");
+    // JLC / generic CPL and centroid names
+    expect(categorizeFile("CPL_myboard.csv")).toBe("other");
+    expect(categorizeFile("centroid.csv")).toBe("other");
+    expect(categorizeFile("Pick Place for myboard.csv")).toBe("other");
+    expect(categorizeFile("placement_data.csv")).toBe("other");
+  });
+
+  it("keeps real BOM names as bom despite the CPL heuristic", () => {
+    expect(categorizeFile("parts.csv")).toBe("bom");
+    expect(categorizeFile("BOM_myboard.csv")).toBe("bom");
+    expect(categorizeFile("proposal.csv")).toBe("bom"); // "pos" inside a word
+    expect(categorizeFile("myboard-bom.csv")).toBe("bom");
+  });
 });
 
 describe("isAcceptedFile", () => {

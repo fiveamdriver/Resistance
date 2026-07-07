@@ -22,9 +22,7 @@ import {
   NetlistParseSummary,
   NetRecord,
   PinRef,
-  upsertComponents,
-  upsertNets,
-  upsertPinsAndConnections,
+  writeConnectivity,
 } from "./netlistParser";
 
 // ---------------------------------------------------------------------------
@@ -110,10 +108,14 @@ export function parseKicadNetlistText(text: string): {
 /**
  * Parse a KiCad S-expression .net file and upsert the connectivity data for
  * the given project. Returns a summary of what was written.
+ *
+ * `opts.prune` (sync provenance only) additionally deletes nets and pins that
+ * are absent from this parse — see writeConnectivity.
  */
 export async function parseKicadNetlistFile(
   projectId: string,
-  filePath: string
+  filePath: string,
+  opts: { prune?: boolean } = {}
 ): Promise<NetlistParseSummary> {
   let text: string;
   try {
@@ -134,15 +136,15 @@ export async function parseKicadNetlistFile(
     );
   }
 
-  await upsertComponents(projectId, components);
-  await upsertNets(projectId, nets);
-  const connectionCount = await upsertPinsAndConnections(projectId, nets);
+  const written = await writeConnectivity(projectId, components, nets, opts);
 
   return {
     componentCount: components.length,
     netCount: nets.length,
-    connectionCount,
+    connectionCount: written.connectionCount,
     components: components.map((c) => c.refDes),
     nets: nets.map((n) => n.name),
+    allRefDes: written.allRefDes,
+    pruned: written.pruned,
   };
 }

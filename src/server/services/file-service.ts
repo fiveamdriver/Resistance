@@ -113,10 +113,13 @@ export async function uploadFiles(
 
     if (category === "netlist") {
       try {
+        // A kicad_sync netlist is a fresh full-design export — authoritative,
+        // so nets/pins absent from it are pruned. Manual uploads stay additive.
+        const prune = opts?.provenance === "kicad_sync";
         const header = (await file.slice(0, 128).text()).trimStart();
         const result = isKicadNetlist(header)
-          ? await parseKicadNetlistFile(projectId, absolutePath)
-          : await parseNetlistFile(projectId, absolutePath);
+          ? await parseKicadNetlistFile(projectId, absolutePath, { prune })
+          : await parseNetlistFile(projectId, absolutePath, { prune });
         parseStatus = "parsed";
         summary = result;
         await prisma.projectFile.update({
@@ -136,7 +139,12 @@ export async function uploadFiles(
       }
     } else if (category === "bom") {
       try {
-        const result = await parseBomFile(projectId, absolutePath);
+        // The file owns its BOM rows (re-parse supersedes them); sync exports
+        // are authoritative for MPN write-back, loose uploads only fill blanks.
+        const result = await parseBomFile(projectId, absolutePath, {
+          fileId: projectFileId,
+          authoritative: opts?.provenance === "kicad_sync",
+        });
         parseStatus = "parsed";
         summary = result;
         await prisma.projectFile.update({

@@ -53,12 +53,27 @@ export function getExtension(filename: string): string {
 }
 
 /**
+ * Pick-and-place / CPL / centroid exports share the BOM's .csv extension but
+ * describe placement, not the bill of materials (audit #3: one imported as a
+ * BOM corrupts quantities and MPNs). Matches the common EDA export names:
+ * KiCad "-pos"/"-all-pos", JLC "CPL_…", Altium "Pick Place …", centroids.
+ */
+const PICK_AND_PLACE_NAME_RE =
+  /(^|[-_.\s])(cpl|pnp|centroid|pos|positions|placement|pick[\s_-]?(and[\s_-]?)?place)([-_.\s]|$)/i;
+
+/**
  * Map a filename to a category. `.txt` is ambiguous between a netlist and a
  * plain document; defaults to "document" but callers can override based on
- * content sniffing.
+ * content sniffing. `.csv` files named like pick-and-place exports are
+ * "other" — bomParser also rejects them by content as a second line of
+ * defense.
  */
 export function categorizeFile(filename: string): FileCategory {
   const ext = getExtension(filename);
+  if (ext === ".csv" || ext === ".xlsx") {
+    const stem = filename.slice(0, filename.length - ext.length);
+    if (PICK_AND_PLACE_NAME_RE.test(stem)) return "other";
+  }
   for (const [category, exts] of Object.entries(ACCEPTED_EXTENSIONS)) {
     if (exts.includes(ext)) return category as FileCategory;
   }

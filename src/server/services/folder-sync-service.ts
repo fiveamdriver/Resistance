@@ -19,6 +19,7 @@ import path from "path";
 import { AppError, ValidationError } from "@/lib/errors";
 import { categorizeFile, isAcceptedFile, type FileCategory } from "@/lib/fileTypes";
 import { parsePcbLayoutFile, type PcbLayoutSummary } from "@/lib/parsers/kicadPcbParser";
+import { type NetlistParseSummary } from "@/lib/parsers/netlistParser";
 import { prisma } from "@/lib/prisma";
 import { resolveStoredPath } from "@/lib/storage";
 import { detectEdaProject } from "@/server/eda/kicad";
@@ -177,7 +178,95 @@ export interface FolderImportResult {
     boardMtime: string;
     kicadVersion: string;
     kicadProjectDir: string;
+    /** Outcome of the stale-component reconciliation pass (audit #1). */
+    reconcile?: ReconcileSummary;
   } | null;
+}
+
+export interface ReconcileSummary {
+  componentsDeleted: number;
+  placementsCleared: number;
+  /** Set when reconciliation refused to delete (partial-looking parse). */
+  skippedReason?: string;
+}
+
+/** SQLite parameter limit is 999; stay well under it for `in` lists. */
+const RECONCILE_CHUNK = 200;
+
+function chunkIds(ids: string[]): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < ids.length; i += RECONCILE_CHUNK) {
+    out.push(ids.slice(i, i + RECONCILE_CHUNK));
+  }
+  return out;
+}
+
+/** Below this many existing components the shrink guard stays out of the way. */
+const SHRINK_GUARD_MIN_ROWS = 20;
+/** Refuse deletes when fewer than this fraction of components survive. */
+const SHRINK_GUARD_MIN_RATIO = 0.5;
+
+/**
+ * Sync is authoritative: delete components that are in neither the fresh
+ * netlist nor the fresh layout (the union keeps layout-only parts like
+ * fiducials and mounting holes alive), and clear placements for components
+ * that left the board but remain in the schematic. Guarded: a fresh parse
+ * that would delete more than half of a non-trivial project looks like a
+ * parser hiccup, not a redesign — upserts stand, deletes are skipped.
+ *
+ * Exported for the DB-backed test suite; only importFromFolder calls it.
+ */
+export async function reconcileComponents(
+  projectId: string,
+  keepRefDes: Set<string>,
+  layout: PcbLayoutSummary | null
+): Promise<ReconcileSummary> {
+  return prisma.$transaction(
+    async (tx) => {
+      const existing = await tx.component.findMany({
+        where: { projectId },
+        select: { id: true, refDes: true, posX: true },
+      });
+      const stale = existing.filter((c) => !keepRefDes.has(c.refDes));
+
+      const surviving = existing.length - stale.length;
+      if (
+        existing.length >= SHRINK_GUARD_MIN_ROWS &&
+        surviving < existing.length * SHRINK_GUARD_MIN_RATIO
+      ) {
+        return {
+          componentsDeleted: 0,
+          placementsCleared: 0,
+          skippedReason: `fresh sync covers only ${surviving} of ${existing.length} components — kept existing rows`,
+        };
+      }
+
+      // Cascades clean up pins, connections, and BOM links.
+      for (const ids of chunkIds(stale.map((c) => c.id))) {
+        await tx.component.deleteMany({ where: { id: { in: ids } } });
+      }
+
+      // A component still in the schematic but no longer placed on the board
+      // must not keep its old coordinates as ground truth.
+      let placementsCleared = 0;
+      if (layout) {
+        const placed = new Set(layout.placedRefDes);
+        const toClear = existing.filter(
+          (c) => keepRefDes.has(c.refDes) && c.posX != null && !placed.has(c.refDes)
+        );
+        for (const ids of chunkIds(toClear.map((c) => c.id))) {
+          await tx.component.updateMany({
+            where: { id: { in: ids } },
+            data: { posX: null, posY: null, rotation: null, layer: null },
+          });
+        }
+        placementsCleared = toClear.length;
+      }
+
+      return { componentsDeleted: stale.length, placementsCleared };
+    },
+    { timeout: 60_000, maxWait: 10_000 }
+  );
 }
 
 /**
@@ -255,10 +344,6 @@ export async function importFromFolder(
       kicadVersion: detected.info.generatorVersion ?? "unknown",
       kicadProjectDir: root,
     };
-    await prisma.project.update({
-      where: { id: projectId },
-      data: { syncMeta: JSON.stringify(result.syncMeta) },
-    });
 
     // Structured board layout (placements, dimensions, stackup, zones) from the
     // .kicad_pcb — powers the layout query tools. Best-effort: a layout-parse
@@ -274,6 +359,42 @@ export async function importFromFolder(
         result.layout = null;
       }
     }
+
+    // ── Reconcile: this sync is the authoritative design state (audit #1) ──
+    // Delete components in neither the fresh netlist nor the fresh layout.
+    // Requires a successfully parsed netlist; if the folder has a board file
+    // whose layout parse failed, skip deletes — without placements we cannot
+    // tell fiducials/mounting holes from stale parts.
+    const netlistIdx = artifacts.findIndex((a) => a.kind === "netlist");
+    const netlistOutcome = netlistIdx >= 0 ? result.exports[netlistIdx] : undefined;
+    const netlistSummary =
+      netlistOutcome?.ok && netlistOutcome.parseStatus === "parsed"
+        ? (netlistOutcome.summary as NetlistParseSummary)
+        : null;
+    if (netlistSummary) {
+      if (detected.info.board && !result.layout) {
+        result.syncMeta.reconcile = {
+          componentsDeleted: 0,
+          placementsCleared: 0,
+          skippedReason: "board layout failed to parse — kept existing components",
+        };
+      } else {
+        const keep = new Set([
+          ...netlistSummary.allRefDes,
+          ...(result.layout?.placedRefDes ?? []),
+        ]);
+        result.syncMeta.reconcile = await reconcileComponents(
+          projectId,
+          keep,
+          result.layout
+        );
+      }
+    }
+
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { syncMeta: JSON.stringify(result.syncMeta) },
+    });
   }
 
   // ── Selected loose documents (project_folder provenance) ─────────────────
