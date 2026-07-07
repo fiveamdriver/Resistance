@@ -10,11 +10,14 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 
 import {
+  getBoardDimensions,
   getComponent,
   getNet,
+  getPlacement,
   getProjectSummary,
   listComponents,
   listNets,
+  nearestComponents,
   searchBom,
   tracePin,
 } from "@/lib/board-queries";
@@ -173,6 +176,46 @@ export const boardTools: Anthropic.Messages.Tool[] = [
     description:
       "Return the schematic sheet tree: root sheet plus all hierarchical sub-sheets, each with its file name, instance path, and symbol count. Use to understand multi-sheet designs before drilling into components. Requires the project to have been synced from KiCad (sync_to_resistance). Returns { error } if the project directory is not known.",
     input_schema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "get_board_dimensions",
+    description:
+      "Return physical board facts parsed from the .kicad_pcb layout: board outline width/height in mm (from Edge.Cuts), copper layer count and stackup names (e.g. F.Cu, In1.Cu, In2.Cu, B.Cu), and the copper zones/pours with their net name and layer. Use for board-size, layer-stackup, and ground/power-plane questions. Returns { available: false } when no board has been parsed — say so rather than inferring layout from the schematic.",
+    input_schema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "get_placement",
+    description:
+      "Return the physical placement of one component from the .kicad_pcb: x/y position in mm (KiCad board coordinates), rotation in degrees, and layer ('F.Cu' = top, 'B.Cu' = bottom). Returns { available: false } if the component is unplaced or no board has been parsed.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        refdes: {
+          type: "string",
+          description: "Reference designator, e.g. 'U1', 'C5'.",
+        },
+      },
+      required: ["refdes"],
+    },
+  },
+  {
+    name: "nearest_components",
+    description:
+      "Return the components physically closest to a given component on the board, nearest first, by center-to-center distance in mm (from the parsed .kicad_pcb). Use for spacing, crowding, thermal-neighbor, and EMI-coupling questions ('what is next to U1?'). Optionally cap results to a radius in mm. Returns { available: false } if the target is unplaced or no board has been parsed.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        refdes: {
+          type: "string",
+          description: "Reference designator to measure from, e.g. 'U1'.",
+        },
+        radiusMm: {
+          type: "number",
+          description: "Optional max center-to-center distance in mm to include.",
+        },
+      },
+      required: ["refdes"],
+    },
   },
 ];
 
@@ -342,6 +385,43 @@ export async function executeBoardTool(
             err instanceof Error ? err.message : "Hierarchy fetch failed",
         };
       }
+    }
+
+    case "get_board_dimensions": {
+      const dims = await getBoardDimensions(projectId);
+      if (!dims) {
+        return {
+          available: false,
+          note: "No board layout parsed. Sync a KiCad project with a .kicad_pcb first.",
+        };
+      }
+      return { available: true, ...dims };
+    }
+
+    case "get_placement": {
+      const refdes = String(input.refdes ?? "");
+      const placement = await getPlacement(projectId, refdes);
+      if (!placement) {
+        return {
+          available: false,
+          note: `No placement for ${refdes || "component"} — unplaced or no board parsed.`,
+        };
+      }
+      return { available: true, ...placement };
+    }
+
+    case "nearest_components": {
+      const refdes = String(input.refdes ?? "");
+      const radiusMm =
+        typeof input.radiusMm === "number" ? input.radiusMm : undefined;
+      const result = await nearestComponents(projectId, refdes, radiusMm);
+      if (!result) {
+        return {
+          available: false,
+          note: `No placement for ${refdes || "component"} — unplaced or no board parsed.`,
+        };
+      }
+      return { available: true, ...result };
     }
 
     default:

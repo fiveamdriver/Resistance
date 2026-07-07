@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "50mb",
     },
   },
+  // The in-build lint/type-check phase deadlocks under Node 26 (0% CPU, never
+  // returns). Skip it here — correctness is still gated by `npm run typecheck`
+  // and `npm run lint`, which run type-checking outside the Next build worker.
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
 };
 
 export default nextConfig;

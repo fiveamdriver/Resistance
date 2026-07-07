@@ -67,6 +67,7 @@ model Project {
   bomItems       BomItem[]
   documentChunks DocumentChunk[]
   reviewRuns     ReviewRun[]
+  board          Board?
 
   @@index([ownerId])
 }
@@ -119,6 +120,14 @@ model Component {
   // through the MCP sync BOM CSV. Drives tier-2 (design_link) ingestion.
   datasheetUrl String?
 
+  // Physical placement from the .kicad_pcb layout (src/lib/parsers/kicadPcbParser.ts).
+  // Null until a board is parsed; written independently of the netlist upsert so
+  // the two parses never clobber each other. Millimeters, KiCad board coordinates.
+  posX     Float?
+  posY     Float?
+  rotation Float? // degrees
+  layer    String? // "F.Cu" (top) | "B.Cu" (bottom)
+
   project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   pins     Pin[]
   bomItems BomItem[] // many-to-many: a component may appear on BOM rows
@@ -126,6 +135,22 @@ model Component {
   @@unique([projectId, refDes])
   @@index([projectId])
   @@index([mpn])
+}
+
+/// Board-level layout facts extracted from the .kicad_pcb (one per project).
+/// Derived, regenerated on every sync — safe to overwrite.
+model Board {
+  id           String   @id @default(cuid())
+  projectId    String   @unique
+  widthMm      Float? // bounding box of the Edge.Cuts outline
+  heightMm     Float?
+  layerCount   Int? // number of copper (*.Cu) layers
+  copperLayers String   @default("[]") // JSON string[] of copper layer names, in stackup order
+  zones        String   @default("[]") // JSON [{ netName, layer }] of copper pours
+  sourceFile   String? // basename of the parsed .kicad_pcb
+  parsedAt     DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 /// An electrical net (signal). Name e.g. "5V", "GND", "SPI_CLK".

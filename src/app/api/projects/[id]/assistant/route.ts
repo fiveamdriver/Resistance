@@ -15,6 +15,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { NextRequest } from "next/server";
 
 import { boardTools, executeBoardTool } from "@/lib/board-tools";
+import { EE_TOOL_NAMES, eeTools, executeEeTool } from "@/lib/ee-assistant-tools";
 import { getSettings } from "@/server/services/settings-service";
 
 export const runtime = "nodejs";
@@ -35,6 +36,12 @@ const SYSTEM_PROMPT = `\
 You are a board-level EE query engine for a specific PCB project. \
 The reader is a staff or principal engineer. Be terse, accurate, and technical. \
 Lead with the answer. Report refdes and net names verbatim, uppercase.
+
+FORMAT. Answers render as GitHub-flavored markdown. When reporting three or \
+more parallel facts (components on a rail, pin connections, BOM rows, \
+placements, zone lists), use a GFM table with concise headers. Use plain \
+sentences for single facts. Never draw ASCII-art diagrams with box-drawing \
+characters or arrows — use a table or a nested list instead.
 
 GROUNDING CONTRACT — no exceptions:
 
@@ -78,7 +85,15 @@ H. NO MODEL MEMORY FOR PARTS. Never answer questions about a specific part's \
 specifications, ratings, pinout, or behavior from your own training knowledge. \
 If neither get_component_specs nor search_documents has the answer, say the \
 information is not on file and suggest uploading the datasheet. Absence of a \
-document is an answer — do not fill the gap.`;
+document is an answer — do not fill the gap.
+
+I. PHYSICAL LAYOUT. Placement and board-geometry facts come ONLY from \
+get_board_dimensions, get_placement, and nearest_components (parsed from the \
+.kicad_pcb). Report positions in mm with the layer (F.Cu = top, B.Cu = bottom) \
+and distances in mm. The netlist has no layout — never infer placement, board \
+size, spacing, or plane coverage from the schematic. If a layout tool returns \
+{ available: false }, say no board layout has been parsed and suggest syncing a \
+KiCad project that includes a .kicad_pcb.`;
 
 // ── route ─────────────────────────────────────────────────────────────────────
 
@@ -129,7 +144,7 @@ export async function POST(
             model: "claude-sonnet-4-6",
             max_tokens: 1500,
             system: SYSTEM_PROMPT,
-            tools: boardTools,
+            tools: [...boardTools, ...eeTools],
             messages: msgs,
           });
 
@@ -151,11 +166,10 @@ export async function POST(
 
           const toolResults = await Promise.all(
             toolBlocks.map(async (block) => {
-              const result = await executeBoardTool(
-                projectId,
-                block.name,
-                block.input as Record<string, unknown>,
-              );
+              const input = block.input as Record<string, unknown>;
+              const result = EE_TOOL_NAMES.has(block.name)
+                ? await executeEeTool(projectId, block.name, input)
+                : await executeBoardTool(projectId, block.name, input);
               return {
                 type: "tool_result" as const,
                 tool_use_id: block.id,

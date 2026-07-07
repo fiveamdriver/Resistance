@@ -141,9 +141,14 @@ async function startServer(dataDir: string): Promise<string> {
 
 function stopServer(): Promise<void> {
   return new Promise((resolve) => {
-    if (!serverProc) return resolve();
-    serverProc.once("exit", () => resolve());
-    serverProc.kill();
+    const proc = serverProc;
+    if (!proc) return resolve();
+    // Intentional stop (quit or API-key restart): detach the crash handler so
+    // killing the process doesn't trip the "backend stopped" dialog + app.quit().
+    serverProc = null;
+    proc.removeAllListeners("exit");
+    proc.once("exit", () => resolve());
+    proc.kill();
   });
 }
 

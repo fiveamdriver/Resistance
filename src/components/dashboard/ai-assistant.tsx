@@ -1,11 +1,61 @@
 "use client";
 
 import { useRef, useState } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface DisplayMessage {
   role: "user" | "assistant";
   text: string;
 }
+
+// Compact styling for assistant markdown — chat bubbles, not documents.
+// GFM tables are the main event; keep everything tight and readable.
+const markdownComponents: Components = {
+  h1: ({ children }) => (
+    <div className="mb-1 mt-2 text-sm font-semibold text-[#c8d3e0]">{children}</div>
+  ),
+  h2: ({ children }) => (
+    <div className="mb-1 mt-2 text-sm font-semibold text-[#c8d3e0]">{children}</div>
+  ),
+  h3: ({ children }) => (
+    <div className="mb-1 mt-2 text-[13px] font-semibold text-[#c8d3e0]">{children}</div>
+  ),
+  p: ({ children }) => <p className="my-1 leading-relaxed">{children}</p>,
+  ul: ({ children }) => <ul className="my-1 list-disc space-y-0.5 pl-5">{children}</ul>,
+  ol: ({ children }) => <ol className="my-1 list-decimal space-y-0.5 pl-5">{children}</ol>,
+  strong: ({ children }) => (
+    <strong className="font-semibold text-[#c8d3e0]">{children}</strong>
+  ),
+  code: ({ children }) => (
+    <code className="rounded bg-[rgba(255,255,255,0.07)] px-1 py-0.5 font-mono text-[12px] text-[#c8d3e0]">
+      {children}
+    </code>
+  ),
+  pre: ({ children }) => (
+    <pre className="my-2 overflow-x-auto rounded-md bg-[rgba(255,255,255,0.05)] p-2 font-mono text-[12px]">
+      {children}
+    </pre>
+  ),
+  hr: () => <hr className="my-2 border-[rgba(255,255,255,0.08)]" />,
+  table: ({ children }) => (
+    <div className="my-2 overflow-x-auto">
+      <table className="w-full border-collapse text-[13px]">{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => (
+    <thead className="border-b border-[rgba(255,255,255,0.15)] text-[#c8d3e0]">
+      {children}
+    </thead>
+  ),
+  th: ({ children }) => (
+    <th className="px-2 py-1 text-left font-semibold">{children}</th>
+  ),
+  tr: ({ children }) => (
+    <tr className="border-b border-[rgba(255,255,255,0.06)] last:border-0">{children}</tr>
+  ),
+  td: ({ children }) => <td className="px-2 py-1 align-top">{children}</td>,
+};
 
 interface ApiMessage {
   role: "user" | "assistant";
@@ -114,13 +164,19 @@ export function AiAssistant({ projectId }: { projectId: string }) {
               className={m.role === "user" ? "text-right" : "text-left"}
             >
               <span
-                className={`inline-block max-w-[80%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm ${
+                className={`inline-block max-w-[80%] rounded-lg px-3 py-2 text-sm ${
                   m.role === "user"
-                    ? "bg-brand text-[#F5F0E8]"
+                    ? "whitespace-pre-wrap bg-brand text-[#F5F0E8]"
                     : "border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.04)] text-[#94a3b8]"
                 }`}
               >
-                {m.text}
+                {m.role === "assistant" ? (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                    {m.text}
+                  </ReactMarkdown>
+                ) : (
+                  m.text
+                )}
                 {isStreamingBubble && (
                   <span className="ml-0.5 inline-block animate-pulse">▋</span>
                 )}

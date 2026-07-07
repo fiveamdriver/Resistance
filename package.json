@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "review:dry-run": "node scripts/dry-run-review.mjs",
-    "desktop:build": "next build && node -e \"fs.cpSync('.next/static','.next/standalone/.next/static',{recursive:true})\" && tsc -p electron",
+    "desktop:build": "next build && node -e \"fs.cpSync('.next/static','.next/standalone/.next/static',{recursive:true});fs.cpSync('node_modules/pdfjs-dist','.next/standalone/node_modules/pdfjs-dist',{recursive:true})\" && tsc -p electron",
     "desktop": "npm run desktop:build && electron electron/dist/main.js",
     "dev:desktop": "tsc -p electron && electron electron/dist/main.js --dev",
     "db:migrate": "prisma migrate dev",
@@ -45,6 +45,8 @@
     "pdf-parse": "^2.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "zod": "^3.24.1"
   },
   "devDependencies": {

@@ -18,6 +18,7 @@ import path from "path";
 
 import { AppError, ValidationError } from "@/lib/errors";
 import { categorizeFile, isAcceptedFile, type FileCategory } from "@/lib/fileTypes";
+import { parsePcbLayoutFile, type PcbLayoutSummary } from "@/lib/parsers/kicadPcbParser";
 import { prisma } from "@/lib/prisma";
 import { resolveStoredPath } from "@/lib/storage";
 import { detectEdaProject } from "@/server/eda/kicad";
@@ -169,6 +170,8 @@ function resolveInside(root: string, relPath: string): string {
 export interface FolderImportResult {
   exports: UploadOutcome[];
   documents: UploadOutcome[];
+  /** Board layout parsed from the linked .kicad_pcb, when one was found. */
+  layout: PcbLayoutSummary | null;
   syncMeta: {
     syncedAt: string;
     boardMtime: string;
@@ -210,7 +213,12 @@ export async function importFromFolder(
   const project = await getLinkedProject(projectId);
   const root = project.kicadProjectPath;
 
-  const result: FolderImportResult = { exports: [], documents: [], syncMeta: null };
+  const result: FolderImportResult = {
+    exports: [],
+    documents: [],
+    layout: null,
+    syncMeta: null,
+  };
 
   // ── Fresh EDA exports (kicad_sync provenance) ─────────────────────────────
   if (options.runExports) {
@@ -251,6 +259,21 @@ export async function importFromFolder(
       where: { id: projectId },
       data: { syncMeta: JSON.stringify(result.syncMeta) },
     });
+
+    // Structured board layout (placements, dimensions, stackup, zones) from the
+    // .kicad_pcb — powers the layout query tools. Best-effort: a layout-parse
+    // failure must never fail a sync, same as the exports above.
+    if (detected.info.board) {
+      try {
+        result.layout = await parsePcbLayoutFile(
+          projectId,
+          detected.info.board,
+          path.basename(detected.info.board)
+        );
+      } catch {
+        result.layout = null;
+      }
+    }
   }
 
   // ── Selected loose documents (project_folder provenance) ─────────────────
