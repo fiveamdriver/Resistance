@@ -48,8 +48,12 @@ export async function uploadFiles(
   projectId: string,
   files: File[],
   opts?: {
-    /** How the files arrived. "kicad_sync" marks pushes from the KiCad MCP server. */
-    provenance?: "upload" | "kicad_sync";
+    /**
+     * How the files arrived. "kicad_sync" marks fresh EDA exports (MCP server
+     * or in-app folder sync); "project_folder" marks loose documents imported
+     * from a linked folder — present there, but not produced by the EDA tool.
+     */
+    provenance?: "upload" | "kicad_sync" | "project_folder";
   }
 ): Promise<UploadOutcome[]> {
   await assertProjectExists(projectId);

@@ -1,9 +1,22 @@
 # Resistance Desktop App — Plan
 
-Status: **Phase 1 implemented 2026-07-05** (`47c89ad`) — spike passed and
-the shell boots, migrates, backs up, and authenticates as specified below;
-downgrade refusal and the key-set flow remain untested until a second
-migration and the Phase 2 settings UI exist. Phases 2–4 not started.
+Status: **Phase 1 implemented 2026-07-05** (`47c89ad`); **Phase 2
+implemented 2026-07-06** — app menu + Settings (Cmd+,), single-instance
+lock, remembered window bounds, dock icon, native file/folder picker IPC,
+and the /settings page (data-handling disclosure, AI + datasheet-fetch off
+switches enforced server-side, BYOK key entry, kicad-cli detection with
+manual override). The second migration (AppSetting) exercised
+backup-before-migrate for real, and downgrade refusal turned out to be
+**dead as originally written** — Prisma 6's `migrate status` says "up to
+date" even when the DB is ahead of the app — so it now compares the
+`_prisma_migrations` ledger against the local migrations directory
+(electron/read-migrations.ts); both directions are verified. safeStorage
+key roundtrip verified. Still untested: the key-set → backend-restart flow
+end-to-end (needs a real key typed into the UI). **Phase 4 implemented
+2026-07-06** (see its section for notes) — folder link, categorized
+checkbox import, sync button, and opt-in auto-sync watcher all verified
+end-to-end. Phase 3 (packaging/signing) not started; Apple Developer
+enrollment still pending.
 Originally proposed 2026-07-05. Follows from the KiCad sync
 provenance work (`kicad_sync` files + `syncMeta` staleness display) and sets
 up the in-app KiCad folder-link/import flow, which depends on Phases 1–2
@@ -105,7 +118,7 @@ Program enrollment** (see Phase 3 — it has lead time, and nothing built in
 Phases 1–2 may be given to anyone outside the founding team until signing
 lands, or Gatekeeper blocks it).
 
-## Phase 2 — Make it feel like an application
+## Phase 2 — Make it feel like an application *(implemented 2026-07-06)*
 
 - Native app menu, dock icon, single-instance lock, remembered window
   size/position; external links open in the system browser.
@@ -150,7 +163,7 @@ lands, or Gatekeeper blocks it).
   is invoked as a user-installed external binary and never distributed,
   so KiCad's GPL does not attach to Resistance.
 
-## Phase 4 — The payoff features
+## Phase 4 — The payoff features *(implemented 2026-07-06)*
 
 With the shell in place: "Link KiCad project folder" with a native picker,
 inclusive checkbox-scan import (fresh `kicad-cli` netlist/BOM exports
@@ -158,6 +171,24 @@ default-checked with `kicad_sync` provenance; loose folder docs under a
 new `project_folder` provenance), then a file watcher for auto-sync. The
 kicad-mcp Python server stays exactly as it is — the external-agent front
 door — and is not bundled into the app.
+
+Implementation notes (2026-07-06): built as the agreed EDA-adapter
+interface (`src/server/eda/` — KiCad is the first adapter; an Altium
+adapter would return no planned exports and rely on the document scan).
+`folder-sync-service` owns scan/import/syncNow; repeated syncs supersede
+the previous `kicad_sync` exports instead of piling up rows; import paths
+are traversal-checked against the linked root. Auto-sync watchers
+(`watcher-service`) are per-project fs.watch on the folder root, debounced
+2s, reconciled from the DB on first server use and on every project
+update — reconciliation lives in `src/lib/prisma.ts` init, NOT
+`instrumentation.ts`, because instrumentation is also compiled for the
+edge runtime (middleware exists) where the chain's `child_process` import
+can't resolve. The dashboard card (`kicad-folder-card.tsx`) uses the
+desktop folder picker when available and a manual path in the browser.
+Verified end-to-end against `packages/kicad-mcp/tests/fixtures/hier`:
+link → scan (categorized, traversal rejected) → import (netlist parsed,
+BOM linked, doc indexed, syncMeta stamped) → sync-now supersede → watcher
+fire on touch + restore after server restart.
 
 ## Compliance & data handling
 

@@ -27,5 +27,13 @@ export function middleware(request: NextRequest): NextResponse {
     return new NextResponse("Unauthorized", { status: 401 }) as NextResponse;
   }
 
+  // The marketing hero at "/" is for the website; inside the installed app
+  // the front page is the projects list.
+  if (request.nextUrl.pathname === "/") {
+    return NextResponse.redirect(
+      new URL("/projects", request.url)
+    ) as NextResponse;
+  }
+
   return NextResponse.next();
 }

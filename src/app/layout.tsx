@@ -15,6 +15,9 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // In the desktop shell "/" redirects to /projects (see middleware), so the
+  // logo points straight there; on the web it stays the marketing hero.
+  const homeHref = process.env.RESISTANCE_LOCAL_TOKEN ? "/projects" : "/";
   return (
     <html lang="en" className="bg-[#050505]" style={{ backgroundColor: '#050505' }}>
       <head>
@@ -23,7 +26,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-[#050505]">
         <header className="sticky top-0 z-50">
           <div className="flex w-full items-center justify-between px-8 py-5 xl:px-16">
-            <Link href="/" className="text-[32px] font-bold tracking-tight text-[#F5F0E8]">
+            <Link href={homeHref} className="text-[32px] font-bold tracking-tight text-[#F5F0E8]">
               Resistance
             </Link>
             <nav className="flex items-center gap-6 text-sm">

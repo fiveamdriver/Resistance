@@ -93,4 +93,9 @@ export interface DashboardVM {
     boardMtime: string | null; // ISO string
     kicadVersion: string | null;
   } | null;
+  /** Linked KiCad project folder (desktop Phase 4). */
+  kicadFolder: {
+    path: string | null;
+    autoSyncEnabled: boolean;
+  };
 }

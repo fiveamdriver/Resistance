@@ -31,18 +31,27 @@ export const createProjectSchema = z.object({
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
 /**
- * PATCH /api/projects/[id] body. Currently only carries syncMeta, written by
- * the KiCad MCP server after pushing netlist + BOM so the assistant can
- * surface staleness ("last synced 3 hours ago").
+ * PATCH /api/projects/[id] body — partial update. syncMeta is written by the
+ * KiCad MCP server (and the in-app folder sync) after pushing netlist + BOM
+ * so the assistant can surface staleness ("last synced 3 hours ago").
+ * kicadProjectPath/autoSyncEnabled manage the linked EDA folder (Phase 4).
  */
-export const updateProjectSchema = z.object({
-  syncMeta: z.object({
-    syncedAt: z.string().datetime({ offset: true }),
-    boardMtime: z.string().datetime({ offset: true }),
-    kicadVersion: z.string().max(40),
-    kicadProjectDir: z.string().max(500).optional(),
-  }),
-});
+export const updateProjectSchema = z
+  .object({
+    syncMeta: z
+      .object({
+        syncedAt: z.string().datetime({ offset: true }),
+        boardMtime: z.string().datetime({ offset: true }),
+        kicadVersion: z.string().max(40),
+        kicadProjectDir: z.string().max(500).optional(),
+      })
+      .optional(),
+    kicadProjectPath: z.string().min(1).max(1000).nullable().optional(),
+    autoSyncEnabled: z.boolean().optional(),
+  })
+  .refine((data) => Object.values(data).some((v) => v !== undefined), {
+    message: "Update must include at least one field",
+  });
 
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 

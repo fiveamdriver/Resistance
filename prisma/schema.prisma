@@ -54,6 +54,13 @@ model Project {
   // connector has no Json type.
   syncMeta String?
 
+  // Linked EDA project folder for in-app import/sync (desktop Phase 4).
+  // Absolute path on the local machine; null = not linked.
+  kicadProjectPath String?
+  // Re-export netlist/BOM automatically when design files in the linked
+  // folder change (file watcher, src/server/services/watcher-service.ts).
+  autoSyncEnabled  Boolean @default(false)
+
   files          ProjectFile[]
   components      Component[]
   nets           Net[]

@@ -12,6 +12,7 @@ import type { FileVM } from "./view-models";
 const PROVENANCE_LABEL: Record<string, string> = {
   upload: "Uploaded",
   kicad_sync: "Synced from KiCad",
+  project_folder: "From project folder",
   design_link: "Linked",
   web_fetch: "Found online",
 };

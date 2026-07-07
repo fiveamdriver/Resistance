@@ -8,7 +8,7 @@ export default async function ProjectsPage() {
   const projects = await listProjects();
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8 pt-24">
+    <div className="mx-auto max-w-6xl px-6 py-8 pt-6">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-[#F5F0E8]">Projects</h1>

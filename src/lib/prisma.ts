@@ -27,4 +27,17 @@ if (isNew) {
   ensureFtsSchema(prisma).catch((err) =>
     console.error("[prisma] FTS5 init failed:", err)
   );
+
+  // Restore auto-sync folder watchers (they live in process memory). Done
+  // here rather than instrumentation.ts: this module only ever loads in the
+  // Node runtime, while instrumentation is also compiled for the edge
+  // runtime, where the watcher chain's child_process import can't resolve.
+  // Deferred a tick so the import cycle (watcher → prisma) resolves cleanly.
+  setTimeout(() => {
+    import("@/server/services/watcher-service")
+      .then((m) => m.reconcileWatchers())
+      .catch((err) =>
+        console.error("[auto-sync] watcher restore failed:", err)
+      );
+  }, 0);
 }

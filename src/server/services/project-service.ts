@@ -8,7 +8,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { NotFoundError } from "@/lib/errors";
+import { NotFoundError, ValidationError } from "@/lib/errors";
 import {
   createProjectSchema,
   parseOrThrow,
@@ -79,9 +79,9 @@ export async function assertProjectExists(projectId: string) {
 }
 
 /**
- * Partial project update. Today the only mutable field is syncMeta (stamped
- * by the KiCad MCP server after a sync); stored as a JSON string because the
- * SQLite connector has no Json type.
+ * Partial project update: syncMeta (stamped after a sync; JSON string because
+ * the SQLite connector has no Json type), the linked KiCad folder, and the
+ * auto-sync flag.
  */
 export async function updateProject(projectId: string, input: unknown) {
   const data = parseOrThrow(
@@ -90,8 +90,51 @@ export async function updateProject(projectId: string, input: unknown) {
     "Invalid project update payload"
   );
   await assertProjectExists(projectId);
-  return prisma.project.update({
+
+  if (typeof data.kicadProjectPath === "string") {
+    const { statSync } = await import("fs");
+    const path = await import("path");
+    if (!path.isAbsolute(data.kicadProjectPath)) {
+      throw new ValidationError("Folder path must be absolute");
+    }
+    let isDir = false;
+    try {
+      isDir = statSync(data.kicadProjectPath).isDirectory();
+    } catch {
+      // fall through to the error below
+    }
+    if (!isDir) {
+      throw new ValidationError(
+        `Not a folder on this machine: ${data.kicadProjectPath}`
+      );
+    }
+  }
+
+  const project = await prisma.project.update({
     where: { id: projectId },
-    data: { syncMeta: JSON.stringify(data.syncMeta) },
+    data: {
+      ...(data.syncMeta !== undefined && {
+        syncMeta: JSON.stringify(data.syncMeta),
+      }),
+      ...(data.kicadProjectPath !== undefined && {
+        kicadProjectPath: data.kicadProjectPath,
+        // Unlinking the folder turns auto-sync off with it.
+        ...(data.kicadProjectPath === null && { autoSyncEnabled: false }),
+      }),
+      ...(data.autoSyncEnabled !== undefined && {
+        autoSyncEnabled: data.autoSyncEnabled,
+      }),
+    },
   });
+
+  // Folder link / auto-sync changes affect the running file watchers.
+  // Dynamic import to keep the watcher module out of pages that only read.
+  if (data.kicadProjectPath !== undefined || data.autoSyncEnabled !== undefined) {
+    const { reconcileWatchers } = await import("./watcher-service");
+    await reconcileWatchers().catch((err) =>
+      console.error("[auto-sync] watcher reconcile failed:", err)
+    );
+  }
+
+  return project;
 }

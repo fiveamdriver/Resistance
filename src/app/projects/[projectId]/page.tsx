@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DashboardTabs } from "@/components/dashboard/dashboard-tabs";
+import { KicadFolderCard } from "@/components/dashboard/kicad-folder-card";
 import type {
   DashboardVM,
   FileVM,
@@ -137,6 +138,10 @@ function toViewModel(
     datasheetCoverage,
     latestReview,
     kicadSync,
+    kicadFolder: {
+      path: project.kicadProjectPath,
+      autoSyncEnabled: project.autoSyncEnabled,
+    },
   };
 }
 
@@ -160,7 +165,7 @@ export default async function ProjectDashboardPage({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8 pt-24">
+    <div className="mx-auto max-w-6xl px-6 py-8 pt-6">
       <div className="space-y-6">
         <div>
           <Link
@@ -178,6 +183,12 @@ export default async function ProjectDashboardPage({
             </p>
           )}
         </div>
+
+        <KicadFolderCard
+          projectId={vm.project.id}
+          folder={vm.kicadFolder}
+          kicadSync={vm.kicadSync}
+        />
 
         <DashboardTabs vm={vm} />
       </div>
