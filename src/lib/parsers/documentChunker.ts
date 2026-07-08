@@ -19,6 +19,20 @@ export interface ChunkOptions {
   overlap?: number;
 }
 
+/**
+ * Replace unpaired UTF-16 surrogates with U+FFFD. PDF text extraction can
+ * emit lone surrogates from garbled glyph maps; Prisma rejects them at
+ * serialization time ("lone leading surrogate in hex escape"), which made
+ * indexing — and therefore quarantine approval — fail for affected
+ * datasheets. Valid surrogate pairs (emoji, rare CJK) pass through intact.
+ */
+export function sanitizeUtf16(text: string): string {
+  return text.replace(
+    /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g,
+    "�"
+  );
+}
+
 /** Split text into overlapping character-window chunks. */
 export function chunkDocument(
   text: string,
@@ -26,7 +40,7 @@ export function chunkDocument(
 ): DocumentChunkData[] {
   const chunkSize = options.chunkSize ?? 1000;
   const overlap = options.overlap ?? 150;
-  const clean = text.replace(/\r\n/g, "\n").trim();
+  const clean = sanitizeUtf16(text).replace(/\r\n/g, "\n").trim();
 
   if (!clean) return [];
   if (clean.length <= chunkSize) {
@@ -38,7 +52,11 @@ export function chunkDocument(
   let index = 0;
 
   for (let start = 0; start < clean.length; start += step) {
-    const content = clean.slice(start, start + chunkSize).trim();
+    // Sanitize AFTER slicing too: the window boundary can cut a valid
+    // surrogate pair in half (e.g. math glyphs like 𝑉 are two UTF-16 code
+    // units), leaving a lone surrogate at the chunk edge that Prisma
+    // rejects — sanitizing only the whole text misses these.
+    const content = sanitizeUtf16(clean.slice(start, start + chunkSize)).trim();
     if (content) {
       chunks.push({ chunkIndex: index++, content });
     }
