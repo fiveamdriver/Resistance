@@ -72,6 +72,9 @@ GROUNDING RULES — no exceptions:
 - Every board fact (refdes, net, value) must come from a tool result, cited verbatim.
 - An empty/absent result means "not in the parsed data," NOT "absent on the board." \
 Flag such cases as severity "verify", never "possible_bug".
+- An empty search_documents result means "no keyword match," NOT "the document is \
+silent" — the datasheet may word it differently. Retry with alternative terms before \
+treating documentation as absent.
 - Check specsSource on get_component_specs results. "verified_pdf" means the values were \
 extracted from the verified datasheet on file — cite the spec value and its specPages \
 (e.g. "6.5V abs max, datasheet p. 3"). "web_search" (or absent) means the values came \
@@ -181,7 +184,17 @@ export async function runReview(
       const resp = await anthropic.messages.create({
         model,
         max_tokens: 4096,
-        system: SYSTEM_PROMPT,
+        // C1 (EMBEDDINGS_FOR_RAG.md): cache the static prefix. Tools render
+        // before system, so one breakpoint on the system block caches the
+        // tool schemas AND the prompt across all rounds of this run (up to
+        // MAX_ROUNDS) — ~90% off those repeated input tokens.
+        system: [
+          {
+            type: "text" as const,
+            text: SYSTEM_PROMPT,
+            cache_control: { type: "ephemeral" as const },
+          },
+        ],
         tools,
         tool_choice: forceSubmit
           ? { type: "tool", name: SUBMIT_REVIEW_TOOL_NAME }

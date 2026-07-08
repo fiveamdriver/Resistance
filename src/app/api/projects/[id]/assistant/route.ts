@@ -15,6 +15,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { NextRequest } from "next/server";
 
 import { boardTools, executeBoardTool } from "@/lib/board-tools";
+import {
+  executeFetchTool,
+  FETCH_TOOL_NAMES,
+  fetchTools,
+} from "@/lib/datasheet-fetch-tool";
 import { EE_TOOL_NAMES, eeTools, executeEeTool } from "@/lib/ee-assistant-tools";
 import { getSettings } from "@/server/services/settings-service";
 
@@ -83,9 +88,19 @@ never silently pick one.
 
 H. NO MODEL MEMORY FOR PARTS. Never answer questions about a specific part's \
 specifications, ratings, pinout, or behavior from your own training knowledge. \
-If neither get_component_specs nor search_documents has the answer, say the \
-information is not on file and suggest uploading the datasheet. Absence of a \
-document is an answer — do not fill the gap.
+Distinguish three different "nothing found" cases — never conflate them: \
+(1) SEARCH MISSED: a search_documents call returned zero results. That means \
+no keyword match, not that the information is absent — the document may word \
+it differently. Retry with alternative technical terms or synonyms. \
+(2) DATASHEET NOT INGESTED: if reworded searches still find nothing for a \
+part-specific question, call fetch_datasheet(refdes or mpn) to retrieve and \
+index the part's datasheet, then re-run search_documents. If it returns \
+'quarantined', tell the user the datasheet is on file awaiting their one-click \
+approval in the Files tab — that is NOT the same as "not on file". \
+(3) SEARCHED AND ABSENT: only after reworded searches AND a fetch_datasheet \
+attempt come up empty may you say the information is not on file — then say \
+so plainly and suggest uploading the datasheet. Do not fill the gap from \
+memory in any case.
 
 I. PHYSICAL LAYOUT. Placement and board-geometry facts come ONLY from \
 get_board_dimensions, get_placement, and nearest_components (parsed from the \
@@ -98,6 +113,22 @@ KiCad project that includes a .kicad_pcb.`;
 // ── route ─────────────────────────────────────────────────────────────────────
 
 const MAX_TOOL_ROUNDS = 6;
+
+/**
+ * C2 (EMBEDDINGS_FOR_RAG.md): cap the history forwarded to the API (~12
+ * turns). Without this, long chats grow input cost linearly and without
+ * bound. The window must still start with a user turn, so leading assistant
+ * messages left by the slice are dropped.
+ */
+const MAX_HISTORY_MESSAGES = 24;
+
+function capHistory(
+  messages: Anthropic.Messages.MessageParam[],
+): Anthropic.Messages.MessageParam[] {
+  const recent = messages.slice(-MAX_HISTORY_MESSAGES);
+  const firstUser = recent.findIndex((m) => m.role === "user");
+  return firstUser === -1 ? [] : recent.slice(firstUser);
+}
 
 export async function POST(
   request: NextRequest,
@@ -114,6 +145,13 @@ export async function POST(
 
   if (!Array.isArray(body?.messages)) {
     return new Response("body.messages must be an array", { status: 400 });
+  }
+
+  const history = capHistory(body.messages);
+  if (history.length === 0) {
+    return new Response("body.messages must contain a user message", {
+      status: 400,
+    });
   }
 
   if (!(await getSettings()).aiEnabled) {
@@ -136,15 +174,25 @@ export async function POST(
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const msgs: Anthropic.Messages.MessageParam[] = [...body.messages];
+        const msgs: Anthropic.Messages.MessageParam[] = [...history];
         let rounds = 0;
 
         while (true) {
           const resp = await anthropic.messages.create({
             model: "claude-sonnet-4-6",
             max_tokens: 1500,
-            system: SYSTEM_PROMPT,
-            tools: [...boardTools, ...eeTools],
+            // C1: cache the static prefix. Tools render before system, so a
+            // single breakpoint on the system block caches the tool schemas
+            // AND the prompt — ~90% off those input tokens on every round
+            // after the first (5-min TTL).
+            system: [
+              {
+                type: "text" as const,
+                text: SYSTEM_PROMPT,
+                cache_control: { type: "ephemeral" as const },
+              },
+            ],
+            tools: [...boardTools, ...eeTools, ...fetchTools],
             messages: msgs,
           });
 
@@ -167,9 +215,11 @@ export async function POST(
           const toolResults = await Promise.all(
             toolBlocks.map(async (block) => {
               const input = block.input as Record<string, unknown>;
-              const result = EE_TOOL_NAMES.has(block.name)
-                ? await executeEeTool(projectId, block.name, input)
-                : await executeBoardTool(projectId, block.name, input);
+              const result = FETCH_TOOL_NAMES.has(block.name)
+                ? await executeFetchTool(projectId, block.name, input)
+                : EE_TOOL_NAMES.has(block.name)
+                  ? await executeEeTool(projectId, block.name, input)
+                  : await executeBoardTool(projectId, block.name, input);
               return {
                 type: "tool_result" as const,
                 tool_use_id: block.id,
