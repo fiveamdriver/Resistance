@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { escapeFtsQuery } from "./fts";
+import { escapeFtsPhrase, escapeFtsQuery, escapeFtsTerms } from "./fts";
 
 describe("escapeFtsQuery", () => {
   it("quotes plain terms", () => {
@@ -23,5 +23,29 @@ describe("escapeFtsQuery", () => {
 
   it("returns empty string for blank input", () => {
     expect(escapeFtsQuery("   ")).toBe("");
+  });
+});
+
+describe("escapeFtsTerms", () => {
+  it("returns individually quoted terms for OR composition", () => {
+    expect(escapeFtsTerms("maximum current limit")).toEqual([
+      `"maximum"`,
+      `"current"`,
+      `"limit"`,
+    ]);
+  });
+
+  it("returns empty array for blank input", () => {
+    expect(escapeFtsTerms("  ")).toEqual([]);
+  });
+});
+
+describe("escapeFtsPhrase", () => {
+  it("quotes a multi-word phrase as one FTS5 phrase", () => {
+    expect(escapeFtsPhrase("quiescent current")).toBe(`"quiescent current"`);
+  });
+
+  it("doubles embedded quotes", () => {
+    expect(escapeFtsPhrase(`1/4" fuse`)).toBe(`"1/4"" fuse"`);
   });
 });

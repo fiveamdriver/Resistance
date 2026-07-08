@@ -279,6 +279,23 @@ model DatasheetLibrary {
   @@index([mpn])
 }
 
+/// Local log of document searches (EMBEDDINGS_FOR_RAG.md W1 feedback loop).
+/// Rows with hits = 0 are real vocabulary gaps; a later successful query in
+/// the same project shows the rephrasing that worked. Feeds the synonym table
+/// (retrieval-synonyms.ts) and the retrieval eval set. Local-only, best-effort
+/// (a failed write never fails a search).
+model RetrievalLog {
+  id        String   @id @default(cuid())
+  projectId String
+  query     String
+  // Which match strategy produced the outcome: "strict" | "relaxed" | "synonyms"
+  strategy  String
+  hits      Int
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+}
+
 /// App-wide key-value settings (single-user desktop app, so no per-user rows).
 /// Values are JSON-encoded; typed access goes through
 /// src/server/services/settings-service.ts, which owns keys and defaults.

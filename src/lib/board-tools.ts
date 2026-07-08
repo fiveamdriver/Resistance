@@ -143,7 +143,7 @@ export const boardTools: Anthropic.Messages.Tool[] = [
   {
     name: "search_documents",
     description:
-      "Full-text search across the project's verified documents (PDFs, datasheets, app notes, specs, markdown files). Returns the most relevant text chunks, each with its source file, page number, and provenance ('upload' = human-uploaded, 'design_link' = fetched from the engineer's datasheet link, 'web_fetch' = found online by part number). When citing a result, name the file and page. Use when the user asks about something that might be in a document rather than the netlist or BOM. If the tool returns an error, report that document search failed — do not treat it as 'no documents'.",
+      "Full-text search across the project's verified documents (PDFs, datasheets, app notes, specs, markdown files). Returns the most relevant text chunks, each with its source file, page number, and provenance ('upload' = human-uploaded, 'design_link' = fetched from the engineer's datasheet link, 'web_fetch' = found online by part number). Matching is strict-AND first, automatically relaxing to any-term and synonym matching; searchStrategy in the result says which was used. When citing a result, name the file and page. Use when the user asks about something that might be in a document rather than the netlist or BOM. An empty result means no keyword match — the wording may differ, so retry with different technical terms before concluding the information is absent. If the tool returns an error, report that document search failed — do not treat it as 'no documents'.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -323,8 +323,30 @@ export async function executeBoardTool(
       }
       const limit = typeof input.limit === "number" ? Math.min(input.limit, 10) : 5;
       try {
-        const results = await searchDocuments(projectId, query.trim(), limit);
-        return { results, count: results.length };
+        const { results, strategy } = await searchDocuments(
+          projectId,
+          query.trim(),
+          limit
+        );
+        if (results.length === 0) {
+          // W2 (EMBEDDINGS_FOR_RAG.md): an empty result must never read as
+          // "the information does not exist". Say what was tried and tell the
+          // model to retry with different wording before concluding absence.
+          return {
+            results: [],
+            count: 0,
+            searchStrategy: strategy,
+            hint:
+              "No match found even after relaxed (any-term) and synonym matching. " +
+              "The documents may use different wording than this query — retry with " +
+              "alternative technical terms before concluding the information is absent. " +
+              "Zero matches is NOT evidence the information is missing from the documents.",
+          };
+        }
+        // searchStrategy tells the model how loose the match was: "strict"
+        // (all terms present), "relaxed" (any term, ranked), or "synonyms"
+        // (domain-synonym expansion) — so it reads relaxed hits critically.
+        return { results, count: results.length, searchStrategy: strategy };
       } catch (err) {
         // Search failure must be distinguishable from "no matches" so the
         // model reports a broken search instead of an empty library.

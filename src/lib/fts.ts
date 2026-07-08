@@ -11,9 +11,10 @@ import type { PrismaClient } from "@prisma/client";
  * construction.
  *
  * Everything here is idempotent and runs at startup. If the table exists in
- * the old shape (self-contained, with its own content copy), it is dropped
- * and rebuilt from DocumentChunk — the FTS table is always derived state and
- * safe to regenerate (this also makes `prisma db push` dropping it harmless).
+ * an old shape (self-contained with its own content copy, or external-content
+ * without porter stemming), it is dropped and rebuilt from DocumentChunk —
+ * the FTS table is always derived state and safe to regenerate (this also
+ * makes `prisma db push` dropping it harmless).
  */
 
 const TRIGGERS = [
@@ -40,21 +41,32 @@ export async function ensureFtsSchema(prisma: PrismaClient): Promise<void> {
   const existing = await prisma.$queryRaw<Array<{ sql: string | null }>>`
     SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'document_chunks_fts'
   `;
-  const isExternalContent =
-    existing.length > 0 && (existing[0].sql ?? "").includes("content='DocumentChunk'");
+  // Current shape = external-content AND porter-stemmed. A table missing either
+  // (the old self-contained shape, or the unstemmed external-content shape) is
+  // dropped and rebuilt — checking only content= would silently keep an
+  // unstemmed index and "current limiting" would never match "current limit".
+  const existingSql = existing.length > 0 ? (existing[0].sql ?? "") : "";
+  const isCurrentShape =
+    existingSql.includes("content='DocumentChunk'") &&
+    existingSql.includes("porter");
 
-  if (existing.length > 0 && !isExternalContent) {
-    // Old self-contained shape (or unknown) — drop; we rebuild from chunks below.
+  if (existing.length > 0 && !isCurrentShape) {
     await prisma.$executeRawUnsafe(`DROP TABLE document_chunks_fts`);
   }
 
-  const created = existing.length === 0 || !isExternalContent;
+  const created = existing.length === 0 || !isCurrentShape;
   if (created) {
+    // porter stemming folds English inflections ("limiting" ↔ "limit",
+    // "regulation" ↔ "regulates") so qualifier morphology can't cause false
+    // "not on file" answers. Part-number tokens (LM317, MAX232) are unaffected:
+    // unicode61 tokenizes before porter runs, and the stemmer leaves
+    // letter+digit tokens alone.
     await prisma.$executeRawUnsafe(
       `CREATE VIRTUAL TABLE document_chunks_fts USING fts5(
          content,
          content='DocumentChunk',
-         content_rowid='rowid'
+         content_rowid='rowid',
+         tokenize='porter unicode61'
        )`
     );
   }
@@ -89,16 +101,28 @@ async function rebuildFtsIndex(prisma: PrismaClient): Promise<void> {
 }
 
 /**
- * Escape a user query for FTS5 MATCH. Each whitespace-separated term becomes
- * a quoted phrase (internal double quotes doubled), so operator characters in
- * part numbers — "LM317-N", "MAX232(A)" — match literally instead of throwing
- * fts5 syntax errors. Terms are implicitly ANDed.
+ * Split a user query into individually-quoted FTS5 terms (internal double
+ * quotes doubled), so operator characters in part numbers — "LM317-N",
+ * "MAX232(A)" — match literally instead of throwing fts5 syntax errors.
+ * Callers join with " " (implicit AND) or " OR " (relaxed match).
  */
-export function escapeFtsQuery(query: string): string {
+export function escapeFtsTerms(query: string): string[] {
   return query
     .trim()
     .split(/\s+/)
     .filter(Boolean)
-    .map((term) => `"${term.replaceAll(`"`, `""`)}"`)
-    .join(" ");
+    .map((term) => `"${term.replaceAll(`"`, `""`)}"`);
+}
+
+/**
+ * Escape a user query for FTS5 MATCH with implicit-AND semantics: every term
+ * must appear in the chunk.
+ */
+export function escapeFtsQuery(query: string): string {
+  return escapeFtsTerms(query).join(" ");
+}
+
+/** Quote a (possibly multi-word) phrase as a single FTS5 phrase query. */
+export function escapeFtsPhrase(phrase: string): string {
+  return `"${phrase.trim().replaceAll(`"`, `""`)}"`;
 }
