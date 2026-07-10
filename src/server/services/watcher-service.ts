@@ -83,9 +83,10 @@ function startWatcher(projectId: string, dir: string): void {
 
   let watcher: FSWatcher;
   try {
-    // Non-recursive: KiCad design files live at the project root (subsheets
-    // included). Doc subfolders are import-on-demand, not auto-synced.
-    watcher = watch(dir, (_event, filename) => {
+    // Recursive: the linked folder may be a whole repo with the EDA project
+    // nested in a subdirectory. Doc changes still don't trigger a sync — only
+    // design-file extensions do.
+    watcher = watch(dir, { recursive: true }, (_event, filename) => {
       if (!filename) return;
       const ext = path.extname(filename).toLowerCase();
       if (DESIGN_EXTENSIONS.includes(ext)) scheduleSync(projectId);

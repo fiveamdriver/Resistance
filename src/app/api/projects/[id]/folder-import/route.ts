@@ -16,6 +16,8 @@ import { importFromFolder } from "@/server/services/folder-sync-service";
 
 const importSchema = z.object({
   runExports: z.boolean().optional(),
+  /** Scan-relative dir of the EDA project to export ("" = linked root). */
+  projectDir: z.string().max(1000).optional(),
   files: z.array(z.string().min(1).max(1000)).max(200).optional(),
 });
 
@@ -39,6 +41,7 @@ export async function POST(
     const parsed = parseOrThrow(importSchema, body, "Invalid import request");
     const result = await importFromFolder(projectId, {
       runExports: parsed.runExports ?? false,
+      projectDir: parsed.projectDir,
       files: parsed.files ?? [],
     });
     return NextResponse.json({ result });

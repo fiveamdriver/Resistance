@@ -22,16 +22,19 @@ import { parsePcbLayoutFile, type PcbLayoutSummary } from "@/lib/parsers/kicadPc
 import { type NetlistParseSummary } from "@/lib/parsers/netlistParser";
 import { prisma } from "@/lib/prisma";
 import { resolveStoredPath } from "@/lib/storage";
-import { detectEdaProject } from "@/server/eda/kicad";
+import {
+  findEdaProjects,
+  findLegacyKicadProjects,
+  MAX_SCAN_DEPTH,
+  SKIP_DIRS,
+  SKIP_DIR_SUFFIX,
+  type DetectedEdaProject,
+} from "@/server/eda/kicad";
 
 import { uploadFiles, type UploadOutcome } from "./file-service";
 
-/** Directories that are never interesting: VCS, KiCad autosaves, build junk. */
-const SKIP_DIRS = new Set([".git", ".svn", "node_modules", "__pycache__"]);
-const SKIP_DIR_SUFFIX = "-backups";
 /** Design files are represented by the EDA project itself, not the doc scan. */
 const DESIGN_EXTENSIONS = [".kicad_pro", ".kicad_sch", ".kicad_pcb", ".kicad_prl"];
-const MAX_SCAN_DEPTH = 4;
 const MAX_OTHER_FILES = 200;
 
 export interface ScannedFile {
@@ -44,17 +47,26 @@ export interface ScannedFile {
   alreadyImported: boolean;
 }
 
+export interface EdaScanProject {
+  /** Directory relative to the linked folder ("" = the root itself). */
+  relDir: string;
+  adapterId: string;
+  displayName: string;
+  name: string;
+  schematic: string;
+  board: string | null;
+  generatorVersion: string | null;
+  exports: { filename: string; kind: "netlist" | "bom" }[];
+  /** This is the project dir the last sync exported from. */
+  previouslySynced: boolean;
+}
+
 export interface FolderScan {
   folder: string;
-  eda: {
-    adapterId: string;
-    displayName: string;
-    name: string;
-    schematic: string;
-    board: string | null;
-    generatorVersion: string | null;
-    exports: { filename: string; kind: "netlist" | "bom" }[];
-  } | null;
+  /** Every syncable EDA project found in the folder or its subdirectories. */
+  edaProjects: EdaScanProject[];
+  /** Legacy (KiCad ≤5) projects — visible but not syncable until converted. */
+  legacyProjects: { relDir: string; name: string }[];
   documents: ScannedFile[];
   other: { relPath: string; sizeBytes: number }[];
   otherTruncated: boolean;
@@ -101,11 +113,24 @@ async function walk(
   }
 }
 
+/** The EDA project dir the last sync exported from, per syncMeta. */
+function lastSyncedProjectDir(project: { syncMeta: string | null }): string | null {
+  if (!project.syncMeta) return null;
+  try {
+    const meta = JSON.parse(project.syncMeta) as { kicadProjectDir?: unknown };
+    return typeof meta.kicadProjectDir === "string" ? meta.kicadProjectDir : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function scanLinkedFolder(projectId: string): Promise<FolderScan> {
   const project = await getLinkedProject(projectId);
   const root = project.kicadProjectPath;
 
-  const detected = await detectEdaProject(root);
+  const detected = await findEdaProjects(root);
+  const legacy = await findLegacyKicadProjects(root);
+  const syncedDir = lastSyncedProjectDir(project);
   const files: { relPath: string; sizeBytes: number; mtimeMs: number }[] = [];
   await walk(root, root, 0, files);
 
@@ -140,19 +165,21 @@ export async function scanLinkedFolder(projectId: string): Promise<FolderScan> {
 
   return {
     folder: root,
-    eda: detected
-      ? {
-          adapterId: detected.adapter.id,
-          displayName: detected.adapter.displayName,
-          name: detected.info.name,
-          schematic: path.relative(root, detected.info.schematic),
-          board: detected.info.board
-            ? path.relative(root, detected.info.board)
-            : null,
-          generatorVersion: detected.info.generatorVersion,
-          exports: detected.adapter.plannedExports(detected.info),
-        }
-      : null,
+    edaProjects: detected.map((p) => ({
+      relDir: path.relative(root, p.dir),
+      adapterId: p.adapter.id,
+      displayName: p.adapter.displayName,
+      name: p.info.name,
+      schematic: path.relative(root, p.info.schematic),
+      board: p.info.board ? path.relative(root, p.info.board) : null,
+      generatorVersion: p.info.generatorVersion,
+      exports: p.adapter.plannedExports(p.info),
+      previouslySynced: p.dir === syncedDir,
+    })),
+    legacyProjects: legacy.map((l) => ({
+      relDir: path.relative(root, l.dir),
+      name: l.name,
+    })),
     documents,
     other,
     otherTruncated: other.length >= MAX_OTHER_FILES,
@@ -295,9 +322,55 @@ async function removeSupersededExports(
   }
 }
 
+/**
+ * Pick the EDA project a sync/export should run against: an explicit choice
+ * from the import dialog wins, then the dir the last sync used, then the only
+ * project found. Anything else is an error that tells the engineer what the
+ * scan actually saw (multiple boards, legacy-format projects, or nothing).
+ */
+async function resolveExportProject(
+  root: string,
+  project: { syncMeta: string | null },
+  projectDir?: string
+): Promise<DetectedEdaProject> {
+  const projects = await findEdaProjects(root);
+
+  if (projectDir !== undefined) {
+    const abs = resolveInside(root, projectDir);
+    const match = projects.find((p) => p.dir === abs);
+    if (!match) {
+      throw new ValidationError(
+        `No EDA project found at "${projectDir || "."}" — re-scan the folder`
+      );
+    }
+    return match;
+  }
+  if (projects.length === 1) return projects[0];
+  if (projects.length > 1) {
+    const syncedDir = lastSyncedProjectDir(project);
+    const match = projects.find((p) => p.dir === syncedDir);
+    if (match) return match;
+    const names = projects.map((p) => path.relative(root, p.dir) || p.info.name);
+    throw new ValidationError(
+      `Multiple EDA projects found in the linked folder (${names.join(", ")}) — pick one via Import files…`
+    );
+  }
+
+  const legacy = await findLegacyKicadProjects(root);
+  if (legacy.length > 0) {
+    const names = legacy.map((l) => path.relative(root, l.dir) || l.name);
+    throw new ValidationError(
+      `Found ${legacy.length === 1 ? "a legacy KiCad 5 project" : "legacy KiCad 5 projects"} (${names.join(", ")}) — open and save in KiCad 6 or newer to convert, then sync. Documents can still be imported.`
+    );
+  }
+  throw new ValidationError(
+    "No EDA project recognized in the linked folder — nothing to export"
+  );
+}
+
 export async function importFromFolder(
   projectId: string,
-  options: { runExports: boolean; files: string[] }
+  options: { runExports: boolean; files: string[]; projectDir?: string }
 ): Promise<FolderImportResult> {
   const project = await getLinkedProject(projectId);
   const root = project.kicadProjectPath;
@@ -311,12 +384,7 @@ export async function importFromFolder(
 
   // ── Fresh EDA exports (kicad_sync provenance) ─────────────────────────────
   if (options.runExports) {
-    const detected = await detectEdaProject(root);
-    if (!detected) {
-      throw new ValidationError(
-        "No EDA project recognized in the linked folder — nothing to export"
-      );
-    }
+    const detected = await resolveExportProject(root, project, options.projectDir);
     const artifacts = await detected.adapter.exportArtifacts(detected.info);
     await removeSupersededExports(
       projectId,
@@ -342,7 +410,9 @@ export async function importFromFolder(
       syncedAt: new Date().toISOString(),
       boardMtime: new Date(boardMtimeMs || Date.now()).toISOString(),
       kicadVersion: detected.info.generatorVersion ?? "unknown",
-      kicadProjectDir: root,
+      // The project dir this sync exported from — how a repeat sync in a
+      // multi-project folder remembers which board was chosen.
+      kicadProjectDir: detected.dir,
     };
 
     // Structured board layout (placements, dimensions, stackup, zones) from the

@@ -50,6 +50,8 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
 
   const [scan, setScan] = useState<FolderScan | null>(null);
   const [includeExports, setIncludeExports] = useState(true);
+  /** relDir of the EDA project to export when the folder holds several. */
+  const [selectedEda, setSelectedEda] = useState<string | null>(null);
   const [checkedDocs, setCheckedDocs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -75,6 +77,9 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
       setShowPathInput(false);
       setPathInput("");
       setNotice(null);
+      // Linking should flow straight into ingesting: show everything the
+      // folder has to offer, pre-selected, one click from imported.
+      await openImportDialog();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not link folder");
     } finally {
@@ -116,9 +121,22 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
       const body = (await api(`/api/projects/${projectId}/folder-scan`)) as {
         scan: FolderScan;
       };
+      const projects = body.scan.edaProjects;
       setScan(body.scan);
-      setIncludeExports(Boolean(body.scan.eda));
-      setCheckedDocs(new Set());
+      setIncludeExports(projects.length > 0);
+      setSelectedEda(
+        (projects.find((p) => p.previouslySynced) ?? projects[0])?.relDir ?? null
+      );
+      // High-signal files (netlists, BOMs, PDFs, Altium docs) start checked so
+      // importing a folder is one click. Generic .txt/.md ("document") stay
+      // unchecked — repos are full of notes and build junk in those formats.
+      setCheckedDocs(
+        new Set(
+          body.scan.documents
+            .filter((d) => !d.alreadyImported && d.category !== "document")
+            .map((d) => d.relPath)
+        )
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scan failed");
     } finally {
@@ -130,11 +148,13 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
     if (!scan) return;
     setBusy("import");
     setError(null);
+    const runExports = includeExports && selectedEda !== null;
     try {
       const body = (await api(`/api/projects/${projectId}/folder-import`, {
         method: "POST",
         body: JSON.stringify({
-          runExports: includeExports && Boolean(scan.eda),
+          runExports,
+          ...(runExports ? { projectDir: selectedEda } : {}),
           files: [...checkedDocs],
         }),
       })) as {
@@ -155,6 +175,12 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
       setBusy(null);
     }
   }
+
+  const selectedProject =
+    scan?.edaProjects.find((p) => p.relDir === selectedEda) ?? null;
+  const importCount =
+    (includeExports && selectedProject ? selectedProject.exports.length : 0) +
+    checkedDocs.size;
 
   function toggleDoc(relPath: string) {
     setCheckedDocs((prev) => {
@@ -297,31 +323,80 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
               {scan.folder}
             </p>
 
-            {scan.eda ? (
-              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-md border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] p-3">
-                <input
-                  type="checkbox"
-                  checked={includeExports}
-                  onChange={(e) => setIncludeExports(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-[#2dd4bf]"
-                />
-                <span>
+            {scan.edaProjects.length > 0 ? (
+              <div className="mt-4 rounded-md border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] p-3">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={includeExports}
+                    onChange={(e) => setIncludeExports(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-[#2dd4bf]"
+                  />
                   <span className="text-sm font-medium text-[#F5F0E8]">
-                    Fresh {scan.eda.displayName} exports —{" "}
-                    {scan.eda.exports.map((x) => x.filename).join(", ")}
+                    Fresh {scan.edaProjects[0].displayName} exports
+                    {scan.edaProjects.length === 1 &&
+                      ` — ${scan.edaProjects[0].exports.map((x) => x.filename).join(", ")}`}
                   </span>
-                  <span className="mt-0.5 block text-xs text-[#94a3b8]">
-                    Generated now from {scan.eda.schematic}
-                    {scan.eda.generatorVersion &&
-                      ` (KiCad ${scan.eda.generatorVersion})`}{" "}
+                </label>
+                {scan.edaProjects.length > 1 ? (
+                  <div className="mt-2 space-y-1 pl-7">
+                    <p className="text-xs text-[#94a3b8]">
+                      {scan.edaProjects.length} projects found — a Resistance
+                      project tracks one board, pick which to sync:
+                    </p>
+                    {scan.edaProjects.map((p) => (
+                      <label
+                        key={p.relDir}
+                        className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-[rgba(255,255,255,0.03)]"
+                      >
+                        <input
+                          type="radio"
+                          name="eda-project"
+                          checked={selectedEda === p.relDir}
+                          onChange={() => setSelectedEda(p.relDir)}
+                          disabled={!includeExports}
+                          className="h-3.5 w-3.5 accent-[#2dd4bf]"
+                        />
+                        <span className="text-sm text-[#F5F0E8]">{p.name}</span>
+                        <span className="min-w-0 flex-1 truncate font-mono text-xs text-[#4a5568]">
+                          {p.relDir || "."}
+                        </span>
+                        {p.previouslySynced && (
+                          <span className="shrink-0 rounded-full border border-[rgba(255,255,255,0.12)] px-2 py-0.5 text-[10px] text-[#2dd4bf]">
+                            last synced
+                          </span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 pl-7 text-xs text-[#94a3b8]">
+                    Generated now from {scan.edaProjects[0].schematic}
+                    {scan.edaProjects[0].generatorVersion &&
+                      ` (KiCad ${scan.edaProjects[0].generatorVersion})`}{" "}
                     and re-parsed. Replaces the previous sync&apos;s exports.
-                  </span>
-                </span>
-              </label>
-            ) : (
+                  </p>
+                )}
+              </div>
+            ) : scan.legacyProjects.length === 0 ? (
               <p className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-400">
                 No KiCad project recognized in this folder — only documents can
                 be imported.
+              </p>
+            ) : null}
+
+            {scan.legacyProjects.length > 0 && (
+              <p className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-400">
+                {scan.legacyProjects.length === 1
+                  ? "A legacy KiCad 5 project was found"
+                  : `${scan.legacyProjects.length} legacy KiCad 5 projects were found`}{" "}
+                (
+                {scan.legacyProjects
+                  .map((l) => l.relDir || l.name)
+                  .join(", ")}
+                ) — open and save {scan.legacyProjects.length === 1 ? "it" : "one"}{" "}
+                in KiCad 6 or newer to convert it, then re-scan to sync its
+                netlist and BOM. Documents below can be imported now.
               </p>
             )}
 
@@ -389,25 +464,12 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
               <button
                 type="button"
                 onClick={() => void runImport()}
-                disabled={
-                  busy === "import" ||
-                  (!includeExports && checkedDocs.size === 0) ||
-                  (!scan.eda && checkedDocs.size === 0)
-                }
+                disabled={busy === "import" || importCount === 0}
                 className={buttonPrimary}
               >
                 {busy === "import"
                   ? "Importing…"
-                  : `Import ${
-                      (includeExports && scan.eda ? scan.eda.exports.length : 0) +
-                      checkedDocs.size
-                    } file${
-                      (includeExports && scan.eda ? scan.eda.exports.length : 0) +
-                        checkedDocs.size ===
-                      1
-                        ? ""
-                        : "s"
-                    }`}
+                  : `Import ${importCount} file${importCount === 1 ? "" : "s"}`}
               </button>
             </div>
           </div>
