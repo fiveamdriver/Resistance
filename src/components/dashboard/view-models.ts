@@ -92,6 +92,8 @@ export interface DashboardVM {
     syncedAt: string; // ISO string
     boardMtime: string | null; // ISO string
     kicadVersion: string | null;
+    /** Absolute path of the synced .kicad_pro — the "Open in KiCad" target. */
+    kicadProjectFile: string | null;
   } | null;
   /** Linked KiCad project folder (desktop Phase 4). */
   kicadFolder: {

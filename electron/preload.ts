@@ -15,4 +15,8 @@ contextBridge.exposeInMainWorld("resistanceDesktop", {
     ipcRenderer.invoke("dialog:pick-folder"),
   /** Native file picker; null when the user cancels. */
   pickFile: (): Promise<string | null> => ipcRenderer.invoke("dialog:pick-file"),
+  /** Open a file with its default application (e.g. a .pro in KiCad).
+   *  Resolves to an error message, or "" on success. */
+  openPath: (path: string): Promise<string> =>
+    ipcRenderer.invoke("shell:open-path", path),
 });

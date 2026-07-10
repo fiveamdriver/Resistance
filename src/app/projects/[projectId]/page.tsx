@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DashboardTabs } from "@/components/dashboard/dashboard-tabs";
+import { DeleteProjectButton } from "@/components/dashboard/delete-project-button";
 import { KicadFolderCard } from "@/components/dashboard/kicad-folder-card";
 import type {
   DashboardVM,
@@ -64,11 +65,18 @@ function toViewModel(
         "syncedAt" in meta &&
         typeof meta.syncedAt === "string"
       ) {
-        const m = meta as { syncedAt: string; boardMtime?: unknown; kicadVersion?: unknown };
+        const m = meta as {
+          syncedAt: string;
+          boardMtime?: unknown;
+          kicadVersion?: unknown;
+          kicadProjectFile?: unknown;
+        };
         kicadSync = {
           syncedAt: m.syncedAt,
           boardMtime: typeof m.boardMtime === "string" ? m.boardMtime : null,
           kicadVersion: typeof m.kicadVersion === "string" ? m.kicadVersion : null,
+          kicadProjectFile:
+            typeof m.kicadProjectFile === "string" ? m.kicadProjectFile : null,
         };
       }
     } catch {
@@ -167,21 +175,29 @@ export default async function ProjectDashboardPage({
   return (
     <div className="mx-auto max-w-6xl px-6 py-8 pt-6">
       <div className="space-y-6">
-        <div>
-          <Link
-            href="/projects"
-            className="text-sm text-[#4a5568] transition-colors hover:text-[#F5F0E8]"
-          >
-            ← All projects
-          </Link>
-          <h1 className="mt-2 text-2xl font-bold text-[#F5F0E8]">
-            {vm.project.name}
-          </h1>
-          {vm.project.description && (
-            <p className="mt-1 text-sm text-[#94a3b8]">
-              {vm.project.description}
-            </p>
-          )}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <Link
+              href="/projects"
+              className="text-sm text-[#4a5568] transition-colors hover:text-[#F5F0E8]"
+            >
+              ← All projects
+            </Link>
+            <h1 className="mt-2 text-2xl font-bold text-[#F5F0E8]">
+              {vm.project.name}
+            </h1>
+            {vm.project.description && (
+              <p className="mt-1 text-sm text-[#94a3b8]">
+                {vm.project.description}
+              </p>
+            )}
+          </div>
+          <div className="pt-6">
+            <DeleteProjectButton
+              projectId={vm.project.id}
+              projectName={vm.project.name}
+            />
+          </div>
         </div>
 
         <KicadFolderCard

@@ -1,14 +1,14 @@
 /**
- * PATCH /api/projects/[id]
- *
- * Partial project update. Sole caller today is the KiCad MCP server's
- * sync_to_resistance tool, which stamps syncMeta after pushing netlist + BOM.
+ * PATCH  /api/projects/[id] — partial project update (syncMeta from the MCP
+ *         sync tool, linked folder + auto-sync from the dashboard card).
+ * DELETE /api/projects/[id] — delete the project, its rows, and its stored
+ *         uploads (shared library datasheets are kept).
  * Business logic lives in the project service; this layer only handles HTTP.
  */
 import { NextResponse } from "next/server";
 
 import { NotFoundError, toUserError } from "@/lib/errors";
-import { updateProject } from "@/server/services/project-service";
+import { deleteProject, updateProject } from "@/server/services/project-service";
 
 export async function PATCH(
   request: Request,
@@ -36,5 +36,22 @@ export async function PATCH(
     const { code, message, details } = toUserError(error);
     const status = code === "VALIDATION_ERROR" ? 400 : 500;
     return NextResponse.json({ error: message, details }, { status });
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: projectId } = await params;
+  try {
+    await deleteProject(projectId);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    const { message } = toUserError(error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

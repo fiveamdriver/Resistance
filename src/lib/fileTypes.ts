@@ -11,13 +11,21 @@ export type FileCategory =
   | "pdf"
   | "document"
   | "altium"
+  // Engineering-data CSV (telemetry, calibration, measurements): a .csv whose
+  // content-sniffed headers are not BOM-shaped. Assigned by sniffing, never by
+  // extension — categorizeFile still returns "bom" for .csv.
+  | "data"
+  // KiCad board file (.kicad_pcb): components + pad→net connectivity + layout,
+  // the no-schematic import path for legacy or schematic-less designs.
+  | "board"
   | "other";
 
 export type ParseStatus = "pending" | "parsed" | "failed";
 
-/** Allowed upload extensions grouped by the category they map to. */
+/** Allowed upload extensions grouped by the category they map to.
+ *  ("data" is assigned by content sniffing, never by extension.) */
 export const ACCEPTED_EXTENSIONS: Record<
-  Exclude<FileCategory, "other">,
+  Exclude<FileCategory, "other" | "data">,
   string[]
 > = {
   // Altium netlist exports
@@ -31,6 +39,9 @@ export const ACCEPTED_EXTENSIONS: Record<
   // Altium native binary documents (schematic / PCB) — imported & stored;
   // connectivity extraction from the binary is future work (see altiumParser).
   altium: [".schdoc", ".pcbdoc"],
+  // KiCad board: same s-expression format since KiCad 4, parseable without
+  // the schematic (kicadPcbParser extracts components, nets, and layout).
+  board: [".kicad_pcb"],
 };
 
 /** Flat list for the file input `accept` attribute. */
@@ -44,6 +55,7 @@ export const ACCEPT_ATTR = [
   ".docx",
   ".schdoc",
   ".pcbdoc",
+  ".kicad_pcb",
 ].join(",");
 
 /** Extract a lowercased extension (incl. leading dot) from a filename. */

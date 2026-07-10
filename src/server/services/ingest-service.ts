@@ -25,9 +25,12 @@ import { getSettings } from "./settings-service";
 
 export type IngestProvenance = "design_link" | "web_fetch";
 
-/** Higher wins: a live doc is only replaced by a higher-provenance one. */
+/** Higher wins: a live doc is only replaced by a higher-provenance one.
+ *  Documents the engineer already has (uploads, linked project folder)
+ *  outrank anything downloaded. */
 const TIER: Record<string, number> = {
   upload: 3,
+  project_folder: 3,
   design_link: 2,
   web_fetch: 1,
 };
@@ -251,6 +254,16 @@ export async function ingestRemotePdf(req: IngestRequest): Promise<IngestResult>
       return { status: "failed", reason: gate.reason };
     }
 
+    // The tier check above ran before the download; re-check now so two
+    // near-simultaneous passes can't both record the same document.
+    const dup = await prisma.projectFile.findFirst({
+      where: { projectId, mpn, provenance },
+      select: { id: true },
+    });
+    if (dup) {
+      return { status: "skipped", reason: "Document already recorded for this part" };
+    }
+
     const contentHash = createHash("sha256").update(bytes).digest("hex");
     const stored = await saveLibraryFile(contentHash, ".pdf", bytes);
 
@@ -317,6 +330,136 @@ export async function ingestRemotePdf(req: IngestRequest): Promise<IngestResult>
       reason: err instanceof Error ? err.message : "Unexpected ingestion error",
     };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Pass orchestration — one datasheet pass per project at a time.
+//
+// Every upload batch fires the pass fire-and-forget, and one user action can
+// produce several batches (a folder import runs exports then documents; Sync
+// now can be pressed twice; the auto-sync watcher adds more). Two passes
+// racing each other both see "no doc for this MPN yet" and both download →
+// duplicate rows. Coalesce instead: one running pass per project, and any
+// trigger that arrives mid-run schedules exactly one follow-up.
+// ---------------------------------------------------------------------------
+
+const passInFlight = new Map<string, { rerun: boolean; promise: Promise<void> }>();
+
+async function datasheetPassesOnce(projectId: string): Promise<void> {
+  await matchLocalDatasheets(projectId);
+  await ingestDesignLinkedDatasheets(projectId);
+}
+
+/**
+ * Run the local-match + design-link datasheet passes, serialized per project.
+ * Safe to call from anywhere, any number of times; never throws.
+ */
+export async function runDatasheetPasses(projectId: string): Promise<void> {
+  const running = passInFlight.get(projectId);
+  if (running) {
+    running.rerun = true;
+    return running.promise;
+  }
+
+  const entry = { rerun: false, promise: Promise.resolve() };
+  entry.promise = (async () => {
+    try {
+      do {
+        entry.rerun = false;
+        await datasheetPassesOnce(projectId);
+      } while (entry.rerun);
+    } catch (err) {
+      console.error("[ingest] datasheet passes failed:", err);
+    } finally {
+      passInFlight.delete(projectId);
+    }
+  })();
+  passInFlight.set(projectId, entry);
+  return entry.promise;
+}
+
+/**
+ * Tier-0 pass, run before any remote tier: match PDFs the engineer already
+ * has (manual uploads, linked-folder imports) to components by MPN in the
+ * filename, confirm the part number actually appears in the document, and
+ * stamp the file as that part's datasheet. A verified local copy then
+ * outranks (and short-circuits) the design_link / web_fetch downloads.
+ *
+ * Filename matching uses the same candidate rules as content verification
+ * ("stm32h750vbt6.pdf" ↔ MPN "STM32H750VBT6"); when several MPNs match one
+ * filename, the longest (most specific) match wins. A file whose content
+ * fails the gate stays a plain indexed document — no quarantine, since the
+ * engineer never claimed it was a datasheet.
+ */
+export async function matchLocalDatasheets(
+  projectId: string
+): Promise<IngestResult[]> {
+  const components = await prisma.component.findMany({
+    where: { projectId, mpn: { not: null } },
+    select: { mpn: true },
+  });
+  const mpns = [...new Set(components.map((c) => c.mpn).filter((m): m is string => !!m))];
+  if (mpns.length === 0) return [];
+
+  // Local PDFs not yet identified as any part's datasheet.
+  const files = await prisma.projectFile.findMany({
+    where: {
+      projectId,
+      category: "pdf",
+      mpn: null,
+      provenance: { in: ["upload", "project_folder"] },
+      verifyStatus: "verified",
+    },
+    select: { id: true, originalName: true, path: true, provenance: true },
+  });
+
+  const results: IngestResult[] = [];
+  for (const file of files) {
+    const stem = normalizeAlnum(file.originalName.replace(/\.pdf$/i, ""));
+    let matched: string | null = null;
+    let matchedLen = 0;
+    for (const mpn of mpns) {
+      for (const candidate of mpnCandidates(mpn)) {
+        if (stem.includes(candidate) && candidate.length > matchedLen) {
+          matched = mpn;
+          matchedLen = candidate.length;
+        }
+      }
+    }
+    if (!matched) continue;
+
+    const tier = TIER[file.provenance] ?? 0;
+    if ((await existingTier(projectId, matched)) >= tier) {
+      results.push({ status: "skipped", fileId: file.id, reason: "Already covered by an equal-or-higher tier document" });
+      continue;
+    }
+
+    let bytes: Buffer;
+    try {
+      bytes = await readFile(resolveStoredPath(file.path));
+    } catch {
+      continue; // bytes missing on disk — not this pass's problem to report
+    }
+    const gate = await verifyDatasheetPdf(bytes, matched);
+    if (!gate.ok) {
+      results.push({ status: "failed", fileId: file.id, reason: gate.reason });
+      continue;
+    }
+
+    await prisma.projectFile.update({
+      where: { id: file.id },
+      data: { mpn: matched },
+    });
+    await supersedeLowerTiers(projectId, matched, tier);
+    // Same post-verify refinement as remote ingestion (fire-and-forget).
+    void refineSpecsFromVerifiedPdf(matched);
+    results.push({
+      status: "verified",
+      fileId: file.id,
+      reason: `Matched to ${matched} by filename`,
+    });
+  }
+  return results;
 }
 
 /**

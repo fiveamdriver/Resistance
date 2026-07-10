@@ -239,6 +239,16 @@ app.whenReady().then(async () => {
     return canceled ? null : (filePaths[0] ?? null);
   });
 
+  ipcMain.handle("shell:open-path", async (_event, target: unknown) => {
+    // Absolute file paths only — this exists so the import dialog can hand a
+    // legacy .pro to KiCad; anything else has no business here.
+    if (typeof target !== "string" || !path.isAbsolute(target)) {
+      return "Invalid path";
+    }
+    if (!existsSync(target)) return "File not found";
+    return shell.openPath(target);
+  });
+
   ipcMain.handle("settings:has-api-key", () => hasApiKey(dataDir));
   ipcMain.handle("settings:set-api-key", async (_event, key: string) => {
     saveApiKey(dataDir, key);

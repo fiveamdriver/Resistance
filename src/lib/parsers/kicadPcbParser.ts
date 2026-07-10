@@ -20,6 +20,13 @@ import { AppError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 
 import { extractAttr, extractBlocks } from "./sexpr";
+import {
+  type ComponentRecord,
+  type NetlistParseSummary,
+  type NetRecord,
+  type PinRef,
+  writeConnectivity,
+} from "./netlistParser";
 
 export interface Placement {
   refDes: string;
@@ -65,19 +72,45 @@ export interface PcbLayoutSummary {
 const AT_RE = /\(at\s+(-?[\d.]+)\s+(-?[\d.]+)(?:\s+(-?[\d.]+))?\s*\)/;
 /** Positional reference property: `(property "Reference" "R12" ...)`. */
 const REF_RE = /\(property\s+"Reference"\s+"([^"]*)"/;
-/** Numbered stackup entry: `(0 "F.Cu" signal)`. */
-const LAYER_ENTRY_RE = /\(\d+\s+"([^"]+)"/g;
+/** Legacy (KiCad ≤5) reference: `(fp_text reference U10 ...)`, maybe quoted. */
+const LEGACY_REF_RE = /\(fp_text\s+reference\s+(?:"([^"]*)"|([^\s()]+))/;
+/** Legacy value: `(fp_text value 100nF ...)`, maybe quoted. */
+const LEGACY_VALUE_RE = /\(fp_text\s+value\s+(?:"([^"]*)"|([^\s()]+))/;
+/** Modern value property: `(property "Value" "100nF" ...)`. */
+const VALUE_RE = /\(property\s+"Value"\s+"([^"]*)"/;
+/** Pad number: the first token after `(pad ` — quoted in KiCad 6+, bare in ≤5. */
+const PAD_NUM_RE = /^\(pad\s+(?:"([^"]*)"|([^\s()]+))/;
+/** Net reference inside a pad: `(net 2 "GND")` or `(net 2 GND)`. */
+const PAD_NET_RE = /\(net\s+\d+\s+(?:"([^"]*)"|([^\s()]+))\s*\)/;
+/** Numbered stackup entry: `(0 "F.Cu" signal)`, unquoted in KiCad ≤5. */
+const LAYER_ENTRY_RE = /\(\d+\s+(?:"([^"]+)"|([^\s()]+))/g;
 /** Any point-bearing sub-expr inside a graphic item. */
 const POINT_RE = /\((?:start|end|center|mid|xy)\s+(-?[\d.]+)\s+(-?[\d.]+)\)/g;
 
 const EDGE_CUTS = "Edge.Cuts";
 const GRAPHIC_KEYWORDS = ["gr_line", "gr_rect", "gr_poly", "gr_arc", "gr_circle"];
 
+/**
+ * Footprint blocks across format generations: KiCad 6+ uses `(footprint ...)`,
+ * KiCad ≤5 uses `(module ...)`. A board has one or the other, never both.
+ */
+function footprintBlocks(text: string): string[] {
+  const modern = extractBlocks(text, "footprint");
+  return modern.length > 0 ? modern : extractBlocks(text, "module");
+}
+
+/** RefDes of a footprint block, across formats; null when unset. */
+function blockRefDes(block: string): string | null {
+  const modern = REF_RE.exec(block);
+  if (modern) return modern[1] || null;
+  const legacy = LEGACY_REF_RE.exec(block);
+  return legacy ? (legacy[1] ?? legacy[2] ?? null) : null;
+}
+
 function parsePlacements(text: string): Placement[] {
   const placements: Placement[] = [];
-  for (const block of extractBlocks(text, "footprint")) {
-    const refMatch = REF_RE.exec(block);
-    const refDes = refMatch?.[1];
+  for (const block of footprintBlocks(text)) {
+    const refDes = blockRefDes(block);
     if (!refDes) continue;
 
     const at = AT_RE.exec(block);
@@ -108,7 +141,8 @@ function parseCopperLayers(text: string): string[] {
   LAYER_ENTRY_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = LAYER_ENTRY_RE.exec(stackup)) !== null) {
-    if (m[1].endsWith(".Cu")) names.push(m[1]);
+    const name = m[1] ?? m[2];
+    if (name.endsWith(".Cu")) names.push(name);
   }
   return names;
 }
@@ -119,9 +153,11 @@ function parseDimensions(text: string): { widthMm: number | null; heightMm: numb
   let maxX = -Infinity;
   let maxY = -Infinity;
 
+  // Edge.Cuts layer name is quoted in KiCad 6+, bare in ≤5.
+  const edgeCutsRe = new RegExp(`\\(layer\\s+"?${EDGE_CUTS.replace(".", "\\.")}"?\\s*\\)`);
   for (const keyword of GRAPHIC_KEYWORDS) {
     for (const block of extractBlocks(text, keyword)) {
-      if (!block.includes(`"${EDGE_CUTS}"`)) continue;
+      if (!edgeCutsRe.test(block)) continue;
       POINT_RE.lastIndex = 0;
       let p: RegExpExecArray | null;
       while ((p = POINT_RE.exec(block)) !== null) {
@@ -256,6 +292,114 @@ export async function persistPcbLayout(
     heightMm: board.heightMm,
     zoneCount: board.zones.length,
     placedRefDes: [...new Set(layout.placements.map((p) => p.refDes))],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Board-derived connectivity (components + pad→net) — the no-schematic path.
+//
+// The .kicad_pcb format has carried per-pad net assignments since KiCad 4, so
+// a board file alone yields the full component list and net connectivity —
+// coarser than a schematic netlist (pads, not pin functions; no MPN/datasheet
+// fields), but enough to study a design whose schematic is legacy-format or
+// missing entirely.
+// ---------------------------------------------------------------------------
+
+/** Pure parse of components + nets from board text. Exported for unit tests. */
+export function parseKicadPcbConnectivity(text: string): {
+  components: ComponentRecord[];
+  nets: NetRecord[];
+} {
+  const components: ComponentRecord[] = [];
+  const netPins = new Map<string, PinRef[]>();
+  const seen = new Set<string>();
+
+  for (const block of footprintBlocks(text)) {
+    const refDes = blockRefDes(block);
+    if (!refDes || seen.has(refDes)) continue;
+    seen.add(refDes);
+
+    // Footprint lib id: first token after the block keyword.
+    const head = /^\((?:footprint|module)\s+(?:"([^"]*)"|([^\s()]+))/.exec(block);
+    const footprint = head ? (head[1] ?? head[2] ?? null) : null;
+    const value = VALUE_RE.exec(block)?.[1] ?? (() => {
+      const legacy = LEGACY_VALUE_RE.exec(block);
+      return legacy ? (legacy[1] ?? legacy[2] ?? null) : null;
+    })();
+
+    components.push({
+      refDes,
+      name: value,
+      footprint,
+      mpn: null,
+      datasheetUrl: null,
+    });
+
+    const padSeen = new Set<string>();
+    for (const pad of extractBlocks(block, "pad")) {
+      const num = PAD_NUM_RE.exec(pad);
+      const pinNumber = num ? (num[1] ?? num[2]) : null;
+      if (!pinNumber || pinNumber === '""') continue;
+
+      const net = PAD_NET_RE.exec(pad);
+      const netName = net ? (net[1] ?? net[2]) : null;
+      if (!netName) continue; // unconnected pad
+
+      // Multi-geometry pads repeat the same number (thermal pads etc.) —
+      // one logical pin per (pad, net).
+      const key = `${pinNumber} ${netName}`;
+      if (padSeen.has(key)) continue;
+      padSeen.add(key);
+
+      const pins = netPins.get(netName) ?? [];
+      pins.push({ refDes, pinNumber });
+      netPins.set(netName, pins);
+    }
+  }
+
+  const nets: NetRecord[] = [...netPins.entries()].map(([name, pins]) => ({
+    name,
+    pins,
+  }));
+  return { components, nets };
+}
+
+/**
+ * Parse connectivity from a .kicad_pcb and upsert it through the same
+ * writeConnectivity path the netlist parsers use. Additive (no prune):
+ * a board import must never delete what a netlist established.
+ */
+export async function parseBoardConnectivityFile(
+  projectId: string,
+  filePath: string
+): Promise<NetlistParseSummary> {
+  let text: string;
+  try {
+    text = await readFile(filePath, "utf-8");
+  } catch (err) {
+    throw new AppError(
+      "PARSE_ERROR",
+      `Cannot read KiCad board file: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+
+  const { components, nets } = parseKicadPcbConnectivity(text);
+  if (components.length === 0) {
+    throw new AppError(
+      "PARSE_ERROR",
+      "No footprints found. Verify the file is a KiCad .kicad_pcb board."
+    );
+  }
+
+  const written = await writeConnectivity(projectId, components, nets, {});
+  return {
+    componentCount: components.length,
+    netCount: nets.length,
+    connectionCount: written.connectionCount,
+    components: components.map((c) => c.refDes),
+    nets: nets.map((n) => n.name),
+    allRefDes: written.allRefDes,
+    pruned: written.pruned,
   };
 }
 

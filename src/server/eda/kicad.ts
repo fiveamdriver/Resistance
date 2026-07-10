@@ -94,17 +94,20 @@ export const kicadAdapter: EdaAdapter = {
     // detectable (the engineer can still import files individually).
     let schematic: string | null = null;
     let name: string | null = null;
+    let projectFile: string | null = null;
     for (const pro of proFiles) {
       const candidate = pro.replace(/\.kicad_pro$/, ".kicad_sch");
       if (schFiles.includes(candidate)) {
         schematic = candidate;
         name = path.basename(pro, ".kicad_pro");
+        projectFile = pro;
         break;
       }
     }
     if (!schematic && schFiles.length === 1) {
       schematic = schFiles[0];
       name = path.basename(schematic, ".kicad_sch");
+      projectFile = proFiles.length === 1 ? proFiles[0] : null;
     }
     if (!schematic || !name) return null;
 
@@ -121,6 +124,7 @@ export const kicadAdapter: EdaAdapter = {
       adapterId: "kicad",
       name,
       schematic,
+      projectFile,
       board,
       designFiles: [...schFiles, ...pcbFiles],
       generatorVersion: readGeneratorVersion(board ?? schematic),
@@ -190,6 +194,9 @@ export interface LegacyKicadProject {
   /** Directory basename — legacy dirs often hold one .pro per sheet, so the
    *  folder, not a file stem, is the project's identity. */
   name: string;
+  /** Root project file to open in KiCad (absolute): the .pro whose stem
+   *  matches the directory name, else the lone .pro, else null. */
+  rootPro: string | null;
 }
 
 /** Depth-first list of `root` and its scannable subdirectories. */
@@ -248,7 +255,12 @@ export async function findLegacyKicadProjects(
       legacyPro.length > 0 &&
       legacySch.length > 0
     ) {
-      found.push({ dir, name: path.basename(dir) });
+      const name = path.basename(dir);
+      const rootPro =
+        legacyPro.find(
+          (f) => path.basename(f, ".pro").toLowerCase() === name.toLowerCase()
+        ) ?? (legacyPro.length === 1 ? legacyPro[0] : null);
+      found.push({ dir, name, rootPro });
     }
   }
   return found;

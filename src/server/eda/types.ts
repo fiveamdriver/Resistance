@@ -15,6 +15,9 @@ export interface EdaProjectInfo {
   name: string;
   /** Absolute path to the root schematic (netlist/BOM source). */
   schematic: string;
+  /** Absolute path to the EDA project file (.kicad_pro), when one exists —
+   *  what "Open in KiCad" hands to the OS. */
+  projectFile: string | null;
   /** Absolute path to the board file, when exactly one is unambiguous. */
   board: string | null;
   /** All design files in the folder — what auto-sync watches, and what

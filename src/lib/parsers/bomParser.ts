@@ -84,6 +84,8 @@ const COLUMN_ALIASES: Record<string, string[]> = {
 /**
  * Given the CSV headers (as-is) and an alias list, return the column index or
  * -1 if not found. Tries exact case-insensitive match first, then substring.
+ * Substring matches require ≥3 chars on both sides — telemetry-style headers
+ * ("v", "q", "r") must never claim "value"/"quantity"/"ref".
  */
 function resolveColumn(headers: string[], aliases: string[]): number {
   const lower = headers.map((h) => h.toLowerCase().trim());
@@ -97,7 +99,10 @@ function resolveColumn(headers: string[], aliases: string[]): number {
   // Partial / contains match
   for (const alias of aliases) {
     const a = alias.toLowerCase();
-    const idx = lower.findIndex((h) => h.includes(a) || a.includes(h));
+    if (a.length < 3) continue;
+    const idx = lower.findIndex(
+      (h) => h.length >= 3 && (h.includes(a) || a.includes(h))
+    );
     if (idx !== -1) return idx;
   }
 
@@ -323,6 +328,51 @@ function looksLikePickAndPlace(headers: string[]): boolean {
 }
 
 /**
+ * Do these headers look like a bill of materials? A real BOM has a designator
+ * column; failing that, a description plus at least one other part-ish column
+ * (grouped-BOM exports without designators). Anything else — telemetry logs,
+ * calibration tables, measurement exports — is engineering data, not a BOM.
+ */
+export function csvLooksLikeBom(headers: string[]): boolean {
+  if (looksLikePickAndPlace(headers)) return false;
+  const cols = buildColumnMap(headers);
+  if (cols.refDes !== -1) return true;
+  return (
+    cols.description !== -1 &&
+    (cols.mpn !== -1 ||
+      cols.quantity !== -1 ||
+      cols.manufacturer !== -1 ||
+      cols.footprint !== -1)
+  );
+}
+
+/**
+ * Content-sniff a CSV file's header row. Used by the upload pipeline and the
+ * folder scan to route real BOMs to the BOM parser and everything else to
+ * data-document indexing. Reads only the head of the file.
+ */
+export async function csvFileLooksLikeBom(filePath: string): Promise<boolean> {
+  let head: string;
+  try {
+    const fd = await import("fs/promises").then((fs) => fs.open(filePath, "r"));
+    try {
+      const buf = Buffer.alloc(8192);
+      const { bytesRead } = await fd.read(buf, 0, buf.length, 0);
+      head = buf.subarray(0, bytesRead).toString("utf-8");
+    } finally {
+      await fd.close();
+    }
+  } catch {
+    return false;
+  }
+  const firstLine = head.split(/\r?\n/).find((l) => l.trim() !== "");
+  if (!firstLine) return false;
+  const parsed = Papa.parse<string[]>(firstLine, { header: false });
+  const headers = parsed.data[0]?.map((h) => h.trim()) ?? [];
+  return csvLooksLikeBom(headers);
+}
+
+/**
  * Parse an Altium BOM CSV export and upsert the rows into the project.
  * Returns a summary of what was written and which refdes had no matching component.
  */
@@ -368,15 +418,14 @@ export async function parseBomFile(
     );
   }
 
-  const cols = buildColumnMap(headers);
-
-  if (cols.refDes === -1 && cols.description === -1) {
+  if (!csvLooksLikeBom(headers)) {
     throw new AppError(
       "PARSE_ERROR",
       `Could not identify BOM columns. Found headers: ${headers.join(", ")}. ` +
-        `Expected at least a Designator or Description column.`
+        `Expected a Designator column, or Description plus a part column.`
     );
   }
+  const cols = buildColumnMap(headers);
 
   const dataRows = rows.slice(1);
 

@@ -10,14 +10,19 @@ import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/errors";
 import { categorizeFile } from "@/lib/fileTypes";
 import { assertAltiumBinary } from "@/lib/parsers/altiumParser";
-import { parseBomFile } from "@/lib/parsers/bomParser";
+import { csvFileLooksLikeBom, parseBomFile } from "@/lib/parsers/bomParser";
+import {
+  parseBoardConnectivityFile,
+  parsePcbLayoutFile,
+  type PcbLayoutSummary,
+} from "@/lib/parsers/kicadPcbParser";
 import { isKicadNetlist, parseKicadNetlistFile } from "@/lib/parsers/kicadNetlistParser";
 import { parseNetlistFile } from "@/lib/parsers/netlistParser";
 import { saveUploadedFile } from "@/lib/storage";
 import { parseOrThrow, uploadFileMetaSchema } from "@/lib/validation";
 
 import { indexDocumentFile } from "./document-service";
-import { ingestDesignLinkedDatasheets } from "./ingest-service";
+import { runDatasheetPasses } from "./ingest-service";
 import { assertProjectExists } from "./project-service";
 
 export interface UploadOutcome {
@@ -138,29 +143,61 @@ export async function uploadFiles(
         });
       }
     } else if (category === "bom") {
-      try {
-        // The file owns its BOM rows (re-parse supersedes them); sync exports
-        // are authoritative for MPN write-back, loose uploads only fill blanks.
-        const result = await parseBomFile(projectId, absolutePath, {
-          fileId: projectFileId,
-          authoritative: opts?.provenance === "kicad_sync",
-        });
-        parseStatus = "parsed";
-        summary = result;
-        await prisma.projectFile.update({
-          where: { id: projectFileId },
-          data: { parseStatus: "parsed" },
-        });
-      } catch (err) {
-        parseStatus = "failed";
-        await prisma.projectFile.update({
-          where: { id: projectFileId },
-          data: {
-            parseStatus: "failed",
-            parseError:
-              err instanceof Error ? err.message : "Unexpected parse error",
-          },
-        });
+      // .csv is "bom" by extension only. Content-sniff the headers: a real
+      // BOM goes to the BOM parser; telemetry/calibration/measurement CSVs
+      // become searchable "data" documents instead of garbage BOM rows.
+      const isCsv = absolutePath.toLowerCase().endsWith(".csv");
+      if (isCsv && !(await csvFileLooksLikeBom(absolutePath))) {
+        try {
+          const result = await indexDocumentFile(
+            projectId,
+            projectFileId,
+            absolutePath,
+            "data"
+          );
+          parseStatus = "parsed";
+          summary = result;
+          await prisma.projectFile.update({
+            where: { id: projectFileId },
+            data: { category: "data", parseStatus: "parsed" },
+          });
+        } catch (err) {
+          parseStatus = "failed";
+          await prisma.projectFile.update({
+            where: { id: projectFileId },
+            data: {
+              category: "data",
+              parseStatus: "failed",
+              parseError:
+                err instanceof Error ? err.message : "Document parse error",
+            },
+          });
+        }
+      } else {
+        try {
+          // The file owns its BOM rows (re-parse supersedes them); sync exports
+          // are authoritative for MPN write-back, loose uploads only fill blanks.
+          const result = await parseBomFile(projectId, absolutePath, {
+            fileId: projectFileId,
+            authoritative: opts?.provenance === "kicad_sync",
+          });
+          parseStatus = "parsed";
+          summary = result;
+          await prisma.projectFile.update({
+            where: { id: projectFileId },
+            data: { parseStatus: "parsed" },
+          });
+        } catch (err) {
+          parseStatus = "failed";
+          await prisma.projectFile.update({
+            where: { id: projectFileId },
+            data: {
+              parseStatus: "failed",
+              parseError:
+                err instanceof Error ? err.message : "Unexpected parse error",
+            },
+          });
+        }
       }
     } else if (category === "pdf" || category === "document") {
       try {
@@ -178,6 +215,35 @@ export async function uploadFiles(
           data: {
             parseStatus: "failed",
             parseError: err instanceof Error ? err.message : "Document parse error",
+          },
+        });
+      }
+    } else if (category === "board") {
+      // .kicad_pcb: components + pad→net connectivity (additive — never
+      // deletes what a netlist established), then layout facts. The board
+      // path exists so legacy/schematic-less designs import without KiCad.
+      try {
+        const conn = await parseBoardConnectivityFile(projectId, absolutePath);
+        let layout: PcbLayoutSummary | null = null;
+        try {
+          layout = await parsePcbLayoutFile(projectId, absolutePath, file.name);
+        } catch {
+          // Connectivity landed; missing layout facts shouldn't fail the file.
+        }
+        parseStatus = "parsed";
+        summary = { ...conn, layout };
+        await prisma.projectFile.update({
+          where: { id: projectFileId },
+          data: { parseStatus: "parsed" },
+        });
+      } catch (err) {
+        parseStatus = "failed";
+        await prisma.projectFile.update({
+          where: { id: projectFileId },
+          data: {
+            parseStatus: "failed",
+            parseError:
+              err instanceof Error ? err.message : "Unexpected parse error",
           },
         });
       }
@@ -203,17 +269,17 @@ export async function uploadFiles(
     outcomes.push({ fileName: file.name, ok: true, projectFileId, parseStatus, summary });
   }
 
-  // A successful netlist/BOM parse may have added Component.datasheetUrl
-  // values (KiCad "Datasheet" property carried through the MCP sync). Kick
-  // off tier-2 ingestion fire-and-forget: the upload response never waits on
-  // datasheet downloads; coverage improves in the background.
+  // Datasheet passes, fire-and-forget so the upload response never waits on
+  // them. Local matching runs first: a PDF already in the project (upload or
+  // folder import) whose filename carries a component's MPN becomes that
+  // part's verified datasheet, and the design_link/web_fetch tiers then skip
+  // the covered MPN instead of downloading. Serialized per project — parallel
+  // upload batches must not race each other into duplicate downloads.
   const parsedDesignData = outcomes.some(
     (o) => o.ok && o.parseStatus === "parsed"
   );
   if (parsedDesignData) {
-    void ingestDesignLinkedDatasheets(projectId).catch((err) =>
-      console.error("[ingest] design-link datasheet pass failed:", err)
-    );
+    void runDatasheetPasses(projectId);
   }
 
   return outcomes;

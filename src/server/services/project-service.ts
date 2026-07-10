@@ -79,6 +79,33 @@ export async function assertProjectExists(projectId: string) {
 }
 
 /**
+ * Delete a project and everything it owns. DB rows cascade from the Project
+ * row; stored bytes under uploads/<projectId>/ are removed best-effort.
+ * Shared library datasheets (uploads/library/, content-addressed, referenced
+ * across projects) are intentionally left alone.
+ */
+export async function deleteProject(projectId: string) {
+  await assertProjectExists(projectId);
+  await prisma.project.delete({ where: { id: projectId } });
+
+  const { rm } = await import("fs/promises");
+  const path = await import("path");
+  const { getUploadsRoot } = await import("@/lib/storage");
+  await rm(path.join(getUploadsRoot(), projectId), {
+    recursive: true,
+    force: true,
+  }).catch((err) =>
+    console.error(`[project] could not remove uploads for ${projectId}:`, err)
+  );
+
+  // A deleted project must not keep its auto-sync file watcher alive.
+  const { reconcileWatchers } = await import("./watcher-service");
+  await reconcileWatchers().catch((err) =>
+    console.error("[auto-sync] watcher reconcile failed:", err)
+  );
+}
+
+/**
  * Partial project update: syncMeta (stamped after a sync; JSON string because
  * the SQLite connector has no Json type), the linked KiCad folder, and the
  * auto-sync flag.

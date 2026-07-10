@@ -8,7 +8,7 @@
  * contents in a categorized import dialog, and toggle auto-sync. All the real
  * work happens server-side (folder-sync-service); this card is the front door.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { formatBytes, formatDate } from "@/lib/format";
@@ -33,6 +33,49 @@ async function api(path: string, init?: RequestInit): Promise<unknown> {
   return body;
 }
 
+/**
+ * Which scanned documents start checked. Goal: one-click import of what's
+ * relevant to THIS board without conflating boards or ingesting junk —
+ * a multi-board repo is full of other boards' stale exports, and loose
+ * .csv files are as likely flight logs as BOMs.
+ *
+ * - Files under a different detected board's directory: never pre-checked.
+ * - Netlists: only when there's nothing to sync (a fresh export supersedes
+ *   any stale .net lying in the folder).
+ * - BOM-category files: only in the selected board's directory, or when the
+ *   filename actually says "bom".
+ * - PDFs / Altium docs / data CSVs (content-sniffed telemetry, calibration):
+ *   pre-checked — all ingest cleanly and aren't board-conflating.
+ * - Generic .txt/.md: never pre-checked (notes and build junk).
+ */
+function defaultCheckedDocs(scan: FolderScan, selectedRelDir: string | null): string[] {
+  const boardDirs = [
+    ...scan.edaProjects.map((p) => p.relDir),
+    ...scan.legacyProjects.map((l) => l.relDir),
+  ].filter((d) => d !== "");
+
+  return scan.documents
+    .filter((doc) => {
+      if (doc.alreadyImported || doc.category === "document") return false;
+      const owner = boardDirs.find((d) => doc.relPath.startsWith(d + "/"));
+      const foreign = owner !== undefined && owner !== selectedRelDir;
+      if (foreign) return false;
+      // Netlists and board files are per-board connectivity sources: only
+      // pre-checked when nothing is syncable (fresh exports beat stale files).
+      if (doc.category === "netlist" || doc.category === "board") {
+        return scan.edaProjects.length === 0;
+      }
+      if (doc.category === "bom") {
+        return (
+          (owner !== undefined && owner === selectedRelDir) ||
+          /bom/i.test(doc.relPath.split("/").pop() ?? "")
+        );
+      }
+      return true; // pdf, altium, data
+    })
+    .map((doc) => doc.relPath);
+}
+
 const buttonPrimary =
   "rounded-md bg-[#F5F0E8] px-3 py-1.5 text-sm font-semibold text-black transition-all hover:bg-[#F5F0E8]/90 disabled:opacity-40";
 const buttonSecondary =
@@ -53,10 +96,62 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
   /** relDir of the EDA project to export when the folder holds several. */
   const [selectedEda, setSelectedEda] = useState<string | null>(null);
   const [checkedDocs, setCheckedDocs] = useState<Set<string>>(new Set());
+  /** Legacy board sent to KiCad via "Open in KiCad" — watched for conversion. */
+  const [converting, setConverting] = useState<{ relDir: string; name: string } | null>(null);
+  const convertingRef = useRef(converting);
+  convertingRef.current = converting;
 
   useEffect(() => {
     setDesktop(Boolean(window.resistanceDesktop));
   }, []);
+
+  // After "Open in KiCad", watch the folder for the conversion (the new
+  // .kicad_sch makes the board detectable) and sync it the moment it lands —
+  // the engineer saves in KiCad and comes back to an already-imported board.
+  useEffect(() => {
+    if (!converting) return;
+    const started = Date.now();
+    const CONVERSION_WATCH_MS = 10 * 60_000;
+
+    const timer = setInterval(() => {
+      void (async () => {
+        const watching = convertingRef.current;
+        if (!watching) return;
+        if (Date.now() - started > CONVERSION_WATCH_MS) {
+          setConverting(null);
+          return;
+        }
+        let match = false;
+        try {
+          const body = (await api(`/api/projects/${projectId}/folder-scan`)) as {
+            scan: FolderScan;
+          };
+          match = body.scan.edaProjects.some((p) => p.relDir === watching.relDir);
+        } catch {
+          return; // transient scan failure — keep watching
+        }
+        if (!match || convertingRef.current !== watching) return;
+
+        setConverting(null);
+        setNotice(`${watching.name} conversion detected — importing fresh exports…`);
+        try {
+          await api(`/api/projects/${projectId}/folder-import`, {
+            method: "POST",
+            body: JSON.stringify({ runExports: true, projectDir: watching.relDir }),
+          });
+          setNotice(
+            `${watching.name} converted and synced — netlist and BOM imported.`
+          );
+          setScan(null);
+          router.refresh();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Auto-sync failed");
+        }
+      })();
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [converting, projectId, router]);
 
   const patchProject = useCallback(
     async (body: Record<string, unknown>) => {
@@ -122,21 +217,12 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
         scan: FolderScan;
       };
       const projects = body.scan.edaProjects;
+      const selected =
+        (projects.find((p) => p.previouslySynced) ?? projects[0])?.relDir ?? null;
       setScan(body.scan);
       setIncludeExports(projects.length > 0);
-      setSelectedEda(
-        (projects.find((p) => p.previouslySynced) ?? projects[0])?.relDir ?? null
-      );
-      // High-signal files (netlists, BOMs, PDFs, Altium docs) start checked so
-      // importing a folder is one click. Generic .txt/.md ("document") stay
-      // unchecked — repos are full of notes and build junk in those formats.
-      setCheckedDocs(
-        new Set(
-          body.scan.documents
-            .filter((d) => !d.alreadyImported && d.category !== "document")
-            .map((d) => d.relPath)
-        )
-      );
+      setSelectedEda(selected);
+      setCheckedDocs(new Set(defaultCheckedDocs(body.scan, selected)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scan failed");
     } finally {
@@ -224,6 +310,23 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
               />
               Auto-sync on changes
             </label>
+            {desktop && kicadSync?.kicadProjectFile && (
+              <button
+                type="button"
+                onClick={() =>
+                  void window
+                    .resistanceDesktop!.openPath(kicadSync.kicadProjectFile!)
+                    .then((err) => {
+                      if (err) setError(err);
+                    })
+                }
+                disabled={busy !== null}
+                className={buttonSecondary}
+                title="Open the synced KiCad project — edits sync back on save (auto-sync) or via Sync now"
+              >
+                Open in KiCad
+              </button>
+            )}
             <button
               type="button"
               onClick={() => void syncNow()}
@@ -353,7 +456,12 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
                           type="radio"
                           name="eda-project"
                           checked={selectedEda === p.relDir}
-                          onChange={() => setSelectedEda(p.relDir)}
+                          onChange={() => {
+                            setSelectedEda(p.relDir);
+                            // Board choice changed — re-derive which documents
+                            // are relevant to the newly selected board.
+                            setCheckedDocs(new Set(defaultCheckedDocs(scan, p.relDir)));
+                          }}
                           disabled={!includeExports}
                           className="h-3.5 w-3.5 accent-[#2dd4bf]"
                         />
@@ -386,18 +494,65 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
             ) : null}
 
             {scan.legacyProjects.length > 0 && (
-              <p className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-400">
-                {scan.legacyProjects.length === 1
-                  ? "A legacy KiCad 5 project was found"
-                  : `${scan.legacyProjects.length} legacy KiCad 5 projects were found`}{" "}
-                (
-                {scan.legacyProjects
-                  .map((l) => l.relDir || l.name)
-                  .join(", ")}
-                ) — open and save {scan.legacyProjects.length === 1 ? "it" : "one"}{" "}
-                in KiCad 6 or newer to convert it, then re-scan to sync its
-                netlist and BOM. Documents below can be imported now.
-              </p>
+              <div className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-400">
+                <p>
+                  {scan.legacyProjects.length === 1
+                    ? "This project was made with an old KiCad (version 5 or earlier), which can't be synced directly."
+                    : `${scan.legacyProjects.length} projects here were made with an old KiCad (version 5 or earlier), which can't be synced directly.`}{" "}
+                  You can either check a board file (.kicad_pcb) below to import
+                  its components and connections as-is, or convert a project to
+                  get live syncing:
+                </p>
+                <ol className="mt-2 list-decimal space-y-0.5 pl-4">
+                  <li>
+                    Open the project in KiCad
+                    {desktop ? " (button below)" : " (File → Open Project)"}.
+                  </li>
+                  <li>
+                    Double-click the schematic in KiCad&apos;s file tree; if a
+                    &ldquo;rescue&rdquo; window appears, accept it.
+                  </li>
+                  <li>
+                    Save (Cmd+S) — Resistance detects the conversion and
+                    imports the board automatically.
+                  </li>
+                </ol>
+                <ul className="mt-2 space-y-1">
+                  {scan.legacyProjects.map((l) => (
+                    <li key={l.relDir} className="flex items-center gap-2">
+                      <span className="font-medium">{l.name}</span>
+                      <span className="min-w-0 flex-1 truncate font-mono text-amber-400/60">
+                        {l.proRelPath ?? l.relDir}
+                      </span>
+                      {desktop && l.proRelPath && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void window
+                              .resistanceDesktop!.openPath(
+                                `${scan.folder}/${l.proRelPath}`
+                              )
+                              .then((err) => {
+                                if (err) {
+                                  setError(err);
+                                } else {
+                                  // Watch for the save in KiCad; sync lands
+                                  // automatically once conversion is detected.
+                                  setConverting({ relDir: l.relDir, name: l.name });
+                                }
+                              })
+                          }
+                          className="shrink-0 rounded border border-amber-500/40 px-2 py-0.5 text-amber-300 hover:bg-amber-500/20"
+                        >
+                          {converting?.relDir === l.relDir
+                            ? "Waiting for save…"
+                            : "Open in KiCad"}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {scan.documents.length > 0 && (

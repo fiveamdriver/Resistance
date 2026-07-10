@@ -18,13 +18,37 @@ interface PagedChunk extends DocumentChunkData {
 }
 
 /**
+ * Data CSVs (telemetry, calibration) can be huge and repetitive; indexing a
+ * flight log row-by-row is pure noise. Keep the head — headers plus enough
+ * rows to answer "what does this data contain" — and say what was cut.
+ */
+const MAX_CSV_INDEX_BYTES = 64 * 1024;
+
+function csvIndexText(buffer: Buffer): string {
+  const text = buffer.toString("utf-8");
+  if (buffer.length <= MAX_CSV_INDEX_BYTES) return text;
+  const lines = text.split(/\r?\n/);
+  const kept: string[] = [];
+  let bytes = 0;
+  for (const line of lines) {
+    kept.push(line);
+    bytes += line.length + 1;
+    if (bytes >= MAX_CSV_INDEX_BYTES) break;
+  }
+  return (
+    kept.join("\n") +
+    `\n[truncated for indexing: file has ${lines.length} rows, first ${kept.length} shown]`
+  );
+}
+
+/**
  * Extract text from a document file and produce page-tagged chunks. PDFs are
  * chunked per page so every chunk knows its page number (chunks never span
  * pages); other formats have no page structure.
  */
 export async function extractChunks(
   absolutePath: string,
-  category: "pdf" | "document",
+  category: "pdf" | "document" | "data",
 ): Promise<PagedChunk[]> {
   const buffer = await readFile(absolutePath);
 
@@ -42,7 +66,11 @@ export async function extractChunks(
 
   const ext = path.extname(absolutePath).toLowerCase();
   const text =
-    ext === ".docx" ? await extractDocxText(buffer) : buffer.toString("utf-8");
+    ext === ".docx"
+      ? await extractDocxText(buffer)
+      : ext === ".csv"
+        ? csvIndexText(buffer)
+        : buffer.toString("utf-8");
   return chunkDocument(text).map((c) => ({ ...c, page: null }));
 }
 
@@ -58,7 +86,7 @@ export async function indexDocumentFile(
   projectId: string,
   fileId: string,
   absolutePath: string,
-  category: "pdf" | "document",
+  category: "pdf" | "document" | "data",
 ): Promise<{ chunkCount: number }> {
   const chunks = await extractChunks(absolutePath, category);
 

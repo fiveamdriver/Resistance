@@ -11,6 +11,9 @@ interface ResistanceDesktopBridge {
   pickFolder: () => Promise<string | null>;
   /** Native file picker. Resolves null if the user cancels. */
   pickFile: () => Promise<string | null>;
+  /** Open a file with its default app (e.g. a .pro in KiCad). Resolves to an
+   *  error message, or "" on success. */
+  openPath: (path: string) => Promise<string>;
 }
 
 interface Window {

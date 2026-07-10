@@ -18,6 +18,7 @@ import path from "path";
 
 import { AppError, ValidationError } from "@/lib/errors";
 import { categorizeFile, isAcceptedFile, type FileCategory } from "@/lib/fileTypes";
+import { csvFileLooksLikeBom } from "@/lib/parsers/bomParser";
 import { parsePcbLayoutFile, type PcbLayoutSummary } from "@/lib/parsers/kicadPcbParser";
 import { type NetlistParseSummary } from "@/lib/parsers/netlistParser";
 import { prisma } from "@/lib/prisma";
@@ -66,7 +67,12 @@ export interface FolderScan {
   /** Every syncable EDA project found in the folder or its subdirectories. */
   edaProjects: EdaScanProject[];
   /** Legacy (KiCad ≤5) projects — visible but not syncable until converted. */
-  legacyProjects: { relDir: string; name: string }[];
+  legacyProjects: {
+    relDir: string;
+    name: string;
+    /** Scan-relative path of the root .pro to open in KiCad, when identified. */
+    proRelPath: string | null;
+  }[];
   documents: ScannedFile[];
   other: { relPath: string; sizeBytes: number }[];
   otherTruncated: boolean;
@@ -143,17 +149,34 @@ export async function scanLinkedFolder(projectId: string): Promise<FolderScan> {
     ).map((f) => f.originalName)
   );
 
+  // Board files owned by a syncable project are represented by the sync
+  // itself; any other .kicad_pcb (legacy project, stray board) is importable
+  // directly — the no-schematic connectivity path.
+  const syncedDesignFiles = new Set(
+    detected.flatMap((p) => p.info.designFiles.map((f) => path.relative(root, f)))
+  );
+
   const documents: ScannedFile[] = [];
   const other: { relPath: string; sizeBytes: number }[] = [];
   for (const f of files) {
     const base = path.basename(f.relPath);
-    if (DESIGN_EXTENSIONS.some((ext) => base.toLowerCase().endsWith(ext))) continue;
+    const isBoardFile = base.toLowerCase().endsWith(".kicad_pcb");
+    if (isBoardFile && syncedDesignFiles.has(f.relPath)) continue;
+    if (!isBoardFile && DESIGN_EXTENSIONS.some((ext) => base.toLowerCase().endsWith(ext))) continue;
     if (isAcceptedFile(base)) {
+      // .csv is "bom" by extension only — sniff the headers so the dialog
+      // distinguishes real BOMs from data CSVs (telemetry, calibration).
+      let category = categorizeFile(base);
+      if (category === "bom" && base.toLowerCase().endsWith(".csv")) {
+        if (!(await csvFileLooksLikeBom(path.join(root, f.relPath)))) {
+          category = "data";
+        }
+      }
       documents.push({
         relPath: f.relPath,
         sizeBytes: f.sizeBytes,
         mtime: new Date(f.mtimeMs).toISOString(),
-        category: categorizeFile(base),
+        category,
         alreadyImported: existingNames.has(base),
       });
     } else if (other.length < MAX_OTHER_FILES) {
@@ -179,6 +202,7 @@ export async function scanLinkedFolder(projectId: string): Promise<FolderScan> {
     legacyProjects: legacy.map((l) => ({
       relDir: path.relative(root, l.dir),
       name: l.name,
+      proRelPath: l.rootPro ? path.relative(root, l.rootPro) : null,
     })),
     documents,
     other,
@@ -205,6 +229,8 @@ export interface FolderImportResult {
     boardMtime: string;
     kicadVersion: string;
     kicadProjectDir: string;
+    /** Absolute path of the synced .kicad_pro (Open in KiCad target). */
+    kicadProjectFile: string | null;
     /** Outcome of the stale-component reconciliation pass (audit #1). */
     reconcile?: ReconcileSummary;
   } | null;
@@ -360,7 +386,7 @@ async function resolveExportProject(
   if (legacy.length > 0) {
     const names = legacy.map((l) => path.relative(root, l.dir) || l.name);
     throw new ValidationError(
-      `Found ${legacy.length === 1 ? "a legacy KiCad 5 project" : "legacy KiCad 5 projects"} (${names.join(", ")}) — open and save in KiCad 6 or newer to convert, then sync. Documents can still be imported.`
+      `Found ${legacy.length === 1 ? "a legacy KiCad 5 project" : "legacy KiCad 5 projects"} (${names.join(", ")}) — use Import files… to pull in a board file directly, or open and save the project in KiCad 6+ to enable sync.`
     );
   }
   throw new ValidationError(
@@ -413,6 +439,8 @@ export async function importFromFolder(
       // The project dir this sync exported from — how a repeat sync in a
       // multi-project folder remembers which board was chosen.
       kicadProjectDir: detected.dir,
+      // The .kicad_pro itself — the "Open in KiCad" target on the folder card.
+      kicadProjectFile: detected.info.projectFile,
     };
 
     // Structured board layout (placements, dimensions, stackup, zones) from the
