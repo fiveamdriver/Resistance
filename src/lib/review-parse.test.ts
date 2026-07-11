@@ -35,6 +35,24 @@ describe("parseSubmitReview", () => {
     });
     expect(result.findings).toHaveLength(1);
     expect(result.findings[0].title).toBe("ok one");
+    expect(result.droppedCount).toBe(2);
+  });
+
+  it("reports zero dropped findings on a fully valid submission", () => {
+    const result = parseSubmitReview({
+      summary: "clean",
+      findings: [{ severity: "ok", title: "t", rationale: "r", refdes: [] }],
+    });
+    expect(result.droppedCount).toBe(0);
+  });
+
+  it("counts every finding as dropped when all are malformed (truncation signature)", () => {
+    const result = parseSubmitReview({
+      summary: "long summary survived truncation",
+      findings: [{ block: "Power" }, { severity: "nope" }, "garbage"],
+    });
+    expect(result.findings).toEqual([]);
+    expect(result.droppedCount).toBe(3);
   });
 
   it("defaults block to General and refDes to empty", () => {

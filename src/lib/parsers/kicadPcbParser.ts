@@ -18,6 +18,7 @@ import { readFile } from "fs/promises";
 
 import { AppError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { withProjectLock } from "@/lib/project-lock";
 
 import { extractAttr, extractBlocks } from "./sexpr";
 import {
@@ -88,7 +89,13 @@ const LAYER_ENTRY_RE = /\(\d+\s+(?:"([^"]+)"|([^\s()]+))/g;
 const POINT_RE = /\((?:start|end|center|mid|xy)\s+(-?[\d.]+)\s+(-?[\d.]+)\)/g;
 
 const EDGE_CUTS = "Edge.Cuts";
-const GRAPHIC_KEYWORDS = ["gr_line", "gr_rect", "gr_poly", "gr_arc", "gr_circle"];
+const GRAPHIC_KEYWORDS = [
+  "gr_line",
+  "gr_rect",
+  "gr_poly",
+  "gr_arc",
+  "gr_circle",
+];
 
 /**
  * Footprint blocks across format generations: KiCad 6+ uses `(footprint ...)`,
@@ -147,14 +154,19 @@ function parseCopperLayers(text: string): string[] {
   return names;
 }
 
-function parseDimensions(text: string): { widthMm: number | null; heightMm: number | null } {
+function parseDimensions(text: string): {
+  widthMm: number | null;
+  heightMm: number | null;
+} {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
 
   // Edge.Cuts layer name is quoted in KiCad 6+, bare in ≤5.
-  const edgeCutsRe = new RegExp(`\\(layer\\s+"?${EDGE_CUTS.replace(".", "\\.")}"?\\s*\\)`);
+  const edgeCutsRe = new RegExp(
+    `\\(layer\\s+"?${EDGE_CUTS.replace(".", "\\.")}"?\\s*\\)`
+  );
   for (const keyword of GRAPHIC_KEYWORDS) {
     for (const block of extractBlocks(text, keyword)) {
       if (!edgeCutsRe.test(block)) continue;
@@ -220,68 +232,79 @@ export async function persistPcbLayout(
 ): Promise<PcbLayoutSummary> {
   // Batched + transactional (audit #5): one read, createMany for new
   // placement-only components, targeted updates only where a value changed.
-  await prisma.$transaction(
-    async (tx) => {
-      const existing = await tx.component.findMany({
-        where: { projectId },
-        select: {
-          id: true,
-          refDes: true,
-          posX: true,
-          posY: true,
-          rotation: true,
-          layer: true,
-        },
-      });
-      const byRefDes = new Map(existing.map((c) => [c.refDes, c]));
-
-      const toCreate = layout.placements.filter((p) => !byRefDes.has(p.refDes));
-      if (toCreate.length > 0) {
-        await tx.component.createMany({
-          data: toCreate.map((p) => ({
-            projectId,
-            refDes: p.refDes,
-            posX: p.x,
-            posY: p.y,
-            rotation: p.rotation,
-            layer: p.layer,
-          })),
+  // Serialized per project: this is the createMany that died on the
+  // (projectId, refDes) unique constraint when two syncs overlapped.
+  await withProjectLock(projectId, () =>
+    prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.component.findMany({
+          where: { projectId },
+          select: {
+            id: true,
+            refDes: true,
+            posX: true,
+            posY: true,
+            rotation: true,
+            layer: true,
+          },
         });
-      }
+        const byRefDes = new Map(existing.map((c) => [c.refDes, c]));
 
-      for (const p of layout.placements) {
-        const current = byRefDes.get(p.refDes);
-        if (!current) continue;
-        if (
-          current.posX !== p.x ||
-          current.posY !== p.y ||
-          current.rotation !== p.rotation ||
-          current.layer !== p.layer
-        ) {
-          await tx.component.update({
-            where: { id: current.id },
-            data: { posX: p.x, posY: p.y, rotation: p.rotation, layer: p.layer },
+        const toCreate = layout.placements.filter(
+          (p) => !byRefDes.has(p.refDes)
+        );
+        if (toCreate.length > 0) {
+          await tx.component.createMany({
+            data: toCreate.map((p) => ({
+              projectId,
+              refDes: p.refDes,
+              posX: p.x,
+              posY: p.y,
+              rotation: p.rotation,
+              layer: p.layer,
+            })),
           });
         }
-      }
 
-      const { board } = layout;
-      const data = {
-        widthMm: board.widthMm,
-        heightMm: board.heightMm,
-        layerCount: board.layerCount,
-        copperLayers: JSON.stringify(board.copperLayers),
-        zones: JSON.stringify(board.zones),
-        sourceFile,
-        parsedAt: new Date(),
-      };
-      await tx.board.upsert({
-        where: { projectId },
-        update: data,
-        create: { projectId, ...data },
-      });
-    },
-    { timeout: 60_000, maxWait: 10_000 }
+        for (const p of layout.placements) {
+          const current = byRefDes.get(p.refDes);
+          if (!current) continue;
+          if (
+            current.posX !== p.x ||
+            current.posY !== p.y ||
+            current.rotation !== p.rotation ||
+            current.layer !== p.layer
+          ) {
+            await tx.component.update({
+              where: { id: current.id },
+              data: {
+                posX: p.x,
+                posY: p.y,
+                rotation: p.rotation,
+                layer: p.layer,
+              },
+            });
+          }
+        }
+
+        const { board } = layout;
+        const data = {
+          widthMm: board.widthMm,
+          heightMm: board.heightMm,
+          layerCount: board.layerCount,
+          copperLayers: JSON.stringify(board.copperLayers),
+          zones: JSON.stringify(board.zones),
+          sourceFile,
+          parsedAt: new Date(),
+        };
+        await tx.board.upsert({
+          where: { projectId },
+          update: data,
+          create: { projectId, ...data },
+        });
+      },
+      { timeout: 60_000, maxWait: 10_000 }
+    )
   );
 
   const { board } = layout;
@@ -320,12 +343,16 @@ export function parseKicadPcbConnectivity(text: string): {
     seen.add(refDes);
 
     // Footprint lib id: first token after the block keyword.
-    const head = /^\((?:footprint|module)\s+(?:"([^"]*)"|([^\s()]+))/.exec(block);
+    const head = /^\((?:footprint|module)\s+(?:"([^"]*)"|([^\s()]+))/.exec(
+      block
+    );
     const footprint = head ? (head[1] ?? head[2] ?? null) : null;
-    const value = VALUE_RE.exec(block)?.[1] ?? (() => {
-      const legacy = LEGACY_VALUE_RE.exec(block);
-      return legacy ? (legacy[1] ?? legacy[2] ?? null) : null;
-    })();
+    const value =
+      VALUE_RE.exec(block)?.[1] ??
+      (() => {
+        const legacy = LEGACY_VALUE_RE.exec(block);
+        return legacy ? (legacy[1] ?? legacy[2] ?? null) : null;
+      })();
 
     components.push({
       refDes,
@@ -347,7 +374,7 @@ export function parseKicadPcbConnectivity(text: string): {
 
       // Multi-geometry pads repeat the same number (thermal pads etc.) —
       // one logical pin per (pad, net).
-      const key = `${pinNumber} ${netName}`;
+      const key = `${pinNumber}\0${netName}`;
       if (padSeen.has(key)) continue;
       padSeen.add(key);
 

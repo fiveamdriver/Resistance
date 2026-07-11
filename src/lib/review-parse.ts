@@ -48,7 +48,17 @@ function normalizeFinding(raw: unknown): FindingData | null {
   };
 }
 
-export function parseSubmitReview(input: unknown): ReviewResult {
+export interface ParsedSubmitReview extends ReviewResult {
+  /**
+   * Findings the model submitted that failed validation and were dropped.
+   * A nonzero count with zero surviving findings is the signature of a
+   * mangled submission (e.g. truncated JSON) — callers must not present
+   * such a run as "reviewed clean".
+   */
+  droppedCount: number;
+}
+
+export function parseSubmitReview(input: unknown): ParsedSubmitReview {
   const obj = (
     typeof input === "object" && input !== null ? input : {}
   ) as Record<string, unknown>;
@@ -61,5 +71,6 @@ export function parseSubmitReview(input: unknown): ReviewResult {
   return {
     summary: asString(obj.summary),
     findings,
+    droppedCount: findingsRaw.length - findings.length,
   };
 }

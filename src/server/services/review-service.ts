@@ -183,7 +183,10 @@ export async function runReview(
 
       const resp = await anthropic.messages.create({
         model,
-        max_tokens: 4096,
+        // Large enough for a big board's full submission (summary + a dozen
+        // detailed findings). 4096 silently truncated submit_review mid-JSON
+        // on a 158-component board, which parsed as "no findings".
+        max_tokens: 16000,
         // C1 (EMBEDDINGS_FOR_RAG.md): cache the static prefix. Tools render
         // before system, so one breakpoint on the system block caches the
         // tool schemas AND the prompt across all rounds of this run (up to
@@ -202,6 +205,17 @@ export async function runReview(
         messages,
       });
 
+      // A response cut off by max_tokens is unusable: any tool_use input in
+      // it may be truncated mid-JSON, and the tolerant parser would degrade
+      // that into an empty review that reads as "no findings". Fail loudly
+      // instead — the run is persisted as failed with this message.
+      if (resp.stop_reason === "max_tokens") {
+        throw new AppError(
+          "PARSE_ERROR",
+          "The reviewer's output hit the token limit before it could finish. Re-run the review."
+        );
+      }
+
       const toolUses = resp.content.filter(
         (b): b is Anthropic.Messages.ToolUseBlock => b.type === "tool_use"
       );
@@ -219,7 +233,30 @@ export async function runReview(
       const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
       for (const block of toolUses) {
         if (block.name === SUBMIT_REVIEW_TOOL_NAME) {
-          result = parseSubmitReview(block.input);
+          const parsed = parseSubmitReview(block.input);
+          // Every submitted finding failed validation, or the model submitted
+          // nothing at all — that's a degenerate run, not a clean board.
+          // Storing it as "completed, 0 findings" is how a broken review
+          // masquerades as a passing grade.
+          if (parsed.findings.length === 0 && parsed.droppedCount > 0) {
+            throw new AppError(
+              "PARSE_ERROR",
+              `The reviewer submitted ${parsed.droppedCount} finding(s) but none could be parsed. Re-run the review.`
+            );
+          }
+          if (parsed.findings.length === 0 && !parsed.summary) {
+            throw new AppError(
+              "PARSE_ERROR",
+              "The reviewer returned an empty review. Re-run the review."
+            );
+          }
+          // Partial drops keep the run but must be visible to the reader.
+          if (parsed.droppedCount > 0) {
+            parsed.summary =
+              `${parsed.summary} [Note: ${parsed.droppedCount} additional ` +
+              `finding(s) were malformed and dropped from this report.]`.trim();
+          }
+          result = parsed;
           toolResults.push({
             type: "tool_result",
             tool_use_id: block.id,

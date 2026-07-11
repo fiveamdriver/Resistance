@@ -17,11 +17,19 @@ import { readdir, readFile, stat, unlink } from "fs/promises";
 import path from "path";
 
 import { AppError, ValidationError } from "@/lib/errors";
-import { categorizeFile, isAcceptedFile, type FileCategory } from "@/lib/fileTypes";
+import {
+  categorizeFile,
+  isAcceptedFile,
+  type FileCategory,
+} from "@/lib/fileTypes";
 import { csvFileLooksLikeBom } from "@/lib/parsers/bomParser";
-import { parsePcbLayoutFile, type PcbLayoutSummary } from "@/lib/parsers/kicadPcbParser";
+import {
+  parsePcbLayoutFile,
+  type PcbLayoutSummary,
+} from "@/lib/parsers/kicadPcbParser";
 import { type NetlistParseSummary } from "@/lib/parsers/netlistParser";
 import { prisma } from "@/lib/prisma";
+import { withProjectLock } from "@/lib/project-lock";
 import { resolveStoredPath } from "@/lib/storage";
 import {
   findEdaProjects,
@@ -35,7 +43,12 @@ import {
 import { uploadFiles, type UploadOutcome } from "./file-service";
 
 /** Design files are represented by the EDA project itself, not the doc scan. */
-const DESIGN_EXTENSIONS = [".kicad_pro", ".kicad_sch", ".kicad_pcb", ".kicad_prl"];
+const DESIGN_EXTENSIONS = [
+  ".kicad_pro",
+  ".kicad_sch",
+  ".kicad_pcb",
+  ".kicad_prl",
+];
 const MAX_OTHER_FILES = 200;
 
 export interface ScannedFile {
@@ -85,7 +98,8 @@ async function getLinkedProject(projectId: string) {
     throw new ValidationError("No KiCad folder is linked to this project");
   }
   try {
-    if (!(await stat(project.kicadProjectPath)).isDirectory()) throw new Error();
+    if (!(await stat(project.kicadProjectPath)).isDirectory())
+      throw new Error();
   } catch {
     throw new ValidationError(
       `Linked folder no longer exists: ${project.kicadProjectPath}`
@@ -106,7 +120,8 @@ async function walk(
     if (entry.name.startsWith(".")) continue;
     const abs = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (SKIP_DIRS.has(entry.name) || entry.name.endsWith(SKIP_DIR_SUFFIX)) continue;
+      if (SKIP_DIRS.has(entry.name) || entry.name.endsWith(SKIP_DIR_SUFFIX))
+        continue;
       await walk(root, abs, depth + 1, out);
     } else if (entry.isFile()) {
       const s = await stat(abs);
@@ -120,11 +135,15 @@ async function walk(
 }
 
 /** The EDA project dir the last sync exported from, per syncMeta. */
-function lastSyncedProjectDir(project: { syncMeta: string | null }): string | null {
+function lastSyncedProjectDir(project: {
+  syncMeta: string | null;
+}): string | null {
   if (!project.syncMeta) return null;
   try {
     const meta = JSON.parse(project.syncMeta) as { kicadProjectDir?: unknown };
-    return typeof meta.kicadProjectDir === "string" ? meta.kicadProjectDir : null;
+    return typeof meta.kicadProjectDir === "string"
+      ? meta.kicadProjectDir
+      : null;
   } catch {
     return null;
   }
@@ -153,7 +172,9 @@ export async function scanLinkedFolder(projectId: string): Promise<FolderScan> {
   // itself; any other .kicad_pcb (legacy project, stray board) is importable
   // directly — the no-schematic connectivity path.
   const syncedDesignFiles = new Set(
-    detected.flatMap((p) => p.info.designFiles.map((f) => path.relative(root, f)))
+    detected.flatMap((p) =>
+      p.info.designFiles.map((f) => path.relative(root, f))
+    )
   );
 
   const documents: ScannedFile[] = [];
@@ -162,7 +183,11 @@ export async function scanLinkedFolder(projectId: string): Promise<FolderScan> {
     const base = path.basename(f.relPath);
     const isBoardFile = base.toLowerCase().endsWith(".kicad_pcb");
     if (isBoardFile && syncedDesignFiles.has(f.relPath)) continue;
-    if (!isBoardFile && DESIGN_EXTENSIONS.some((ext) => base.toLowerCase().endsWith(ext))) continue;
+    if (
+      !isBoardFile &&
+      DESIGN_EXTENSIONS.some((ext) => base.toLowerCase().endsWith(ext))
+    )
+      continue;
     if (isAcceptedFile(base)) {
       // .csv is "bom" by extension only — sniff the headers so the dialog
       // distinguishes real BOMs from data CSVs (telemetry, calibration).
@@ -274,51 +299,58 @@ export async function reconcileComponents(
   keepRefDes: Set<string>,
   layout: PcbLayoutSummary | null
 ): Promise<ReconcileSummary> {
-  return prisma.$transaction(
-    async (tx) => {
-      const existing = await tx.component.findMany({
-        where: { projectId },
-        select: { id: true, refDes: true, posX: true },
-      });
-      const stale = existing.filter((c) => !keepRefDes.has(c.refDes));
+  // Same per-project lock as writeConnectivity: reconcile deletes must not
+  // interleave with a concurrent sync's component creates.
+  return withProjectLock(projectId, () =>
+    prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.component.findMany({
+          where: { projectId },
+          select: { id: true, refDes: true, posX: true },
+        });
+        const stale = existing.filter((c) => !keepRefDes.has(c.refDes));
 
-      const surviving = existing.length - stale.length;
-      if (
-        existing.length >= SHRINK_GUARD_MIN_ROWS &&
-        surviving < existing.length * SHRINK_GUARD_MIN_RATIO
-      ) {
-        return {
-          componentsDeleted: 0,
-          placementsCleared: 0,
-          skippedReason: `fresh sync covers only ${surviving} of ${existing.length} components — kept existing rows`,
-        };
-      }
-
-      // Cascades clean up pins, connections, and BOM links.
-      for (const ids of chunkIds(stale.map((c) => c.id))) {
-        await tx.component.deleteMany({ where: { id: { in: ids } } });
-      }
-
-      // A component still in the schematic but no longer placed on the board
-      // must not keep its old coordinates as ground truth.
-      let placementsCleared = 0;
-      if (layout) {
-        const placed = new Set(layout.placedRefDes);
-        const toClear = existing.filter(
-          (c) => keepRefDes.has(c.refDes) && c.posX != null && !placed.has(c.refDes)
-        );
-        for (const ids of chunkIds(toClear.map((c) => c.id))) {
-          await tx.component.updateMany({
-            where: { id: { in: ids } },
-            data: { posX: null, posY: null, rotation: null, layer: null },
-          });
+        const surviving = existing.length - stale.length;
+        if (
+          existing.length >= SHRINK_GUARD_MIN_ROWS &&
+          surviving < existing.length * SHRINK_GUARD_MIN_RATIO
+        ) {
+          return {
+            componentsDeleted: 0,
+            placementsCleared: 0,
+            skippedReason: `fresh sync covers only ${surviving} of ${existing.length} components — kept existing rows`,
+          };
         }
-        placementsCleared = toClear.length;
-      }
 
-      return { componentsDeleted: stale.length, placementsCleared };
-    },
-    { timeout: 60_000, maxWait: 10_000 }
+        // Cascades clean up pins, connections, and BOM links.
+        for (const ids of chunkIds(stale.map((c) => c.id))) {
+          await tx.component.deleteMany({ where: { id: { in: ids } } });
+        }
+
+        // A component still in the schematic but no longer placed on the board
+        // must not keep its old coordinates as ground truth.
+        let placementsCleared = 0;
+        if (layout) {
+          const placed = new Set(layout.placedRefDes);
+          const toClear = existing.filter(
+            (c) =>
+              keepRefDes.has(c.refDes) &&
+              c.posX != null &&
+              !placed.has(c.refDes)
+          );
+          for (const ids of chunkIds(toClear.map((c) => c.id))) {
+            await tx.component.updateMany({
+              where: { id: { in: ids } },
+              data: { posX: null, posY: null, rotation: null, layer: null },
+            });
+          }
+          placementsCleared = toClear.length;
+        }
+
+        return { componentsDeleted: stale.length, placementsCleared };
+      },
+      { timeout: 60_000, maxWait: 10_000 }
+    )
   );
 }
 
@@ -376,7 +408,9 @@ async function resolveExportProject(
     const syncedDir = lastSyncedProjectDir(project);
     const match = projects.find((p) => p.dir === syncedDir);
     if (match) return match;
-    const names = projects.map((p) => path.relative(root, p.dir) || p.info.name);
+    const names = projects.map(
+      (p) => path.relative(root, p.dir) || p.info.name
+    );
     throw new ValidationError(
       `Multiple EDA projects found in the linked folder (${names.join(", ")}) — pick one via Import files…`
     );
@@ -410,7 +444,11 @@ export async function importFromFolder(
 
   // ── Fresh EDA exports (kicad_sync provenance) ─────────────────────────────
   if (options.runExports) {
-    const detected = await resolveExportProject(root, project, options.projectDir);
+    const detected = await resolveExportProject(
+      root,
+      project,
+      options.projectDir
+    );
     const artifacts = await detected.adapter.exportArtifacts(detected.info);
     await removeSupersededExports(
       projectId,
@@ -464,7 +502,8 @@ export async function importFromFolder(
     // whose layout parse failed, skip deletes — without placements we cannot
     // tell fiducials/mounting holes from stale parts.
     const netlistIdx = artifacts.findIndex((a) => a.kind === "netlist");
-    const netlistOutcome = netlistIdx >= 0 ? result.exports[netlistIdx] : undefined;
+    const netlistOutcome =
+      netlistIdx >= 0 ? result.exports[netlistIdx] : undefined;
     const netlistSummary =
       netlistOutcome?.ok && netlistOutcome.parseStatus === "parsed"
         ? (netlistOutcome.summary as NetlistParseSummary)
@@ -474,7 +513,8 @@ export async function importFromFolder(
         result.syncMeta.reconcile = {
           componentsDeleted: 0,
           placementsCleared: 0,
-          skippedReason: "board layout failed to parse — kept existing components",
+          skippedReason:
+            "board layout failed to parse — kept existing components",
         };
       } else {
         const keep = new Set([

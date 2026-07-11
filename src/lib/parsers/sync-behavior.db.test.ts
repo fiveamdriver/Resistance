@@ -42,7 +42,10 @@ async function makeProject(): Promise<string> {
 }
 
 async function writeFixture(name: string, content: string): Promise<string> {
-  const filePath = path.join(dir, `${Math.random().toString(36).slice(2)}-${name}`);
+  const filePath = path.join(
+    dir,
+    `${Math.random().toString(36).slice(2)}-${name}`
+  );
   await writeFile(filePath, content, "utf-8");
   return filePath;
 }
@@ -136,7 +139,10 @@ GND
 R1-2
 )
 `;
-    await parseNetlistFile(projectId, await writeFixture("partial.net", withoutU1));
+    await parseNetlistFile(
+      projectId,
+      await writeFixture("partial.net", withoutU1)
+    );
 
     const u1 = await prisma.component.findUnique({
       where: { projectId_refDes: { projectId, refDes: "U1" } },
@@ -153,7 +159,10 @@ R1-2
       "GND\nR1-2\n",
       "GND\nR1-1\nR1-2\n"
     );
-    await parseNetlistFile(projectId, await writeFixture("rewired.net", rewired));
+    await parseNetlistFile(
+      projectId,
+      await writeFixture("rewired.net", rewired)
+    );
 
     const gnd = await prisma.net.findUniqueOrThrow({
       where: { projectId_name: { projectId, name: "GND" } },
@@ -252,5 +261,54 @@ U9,Ghost part,Nowhere,NOPART-1,,SOIC-8,1
     // Re-parse updates rows instead of duplicating them.
     await parseBomFile(projectId, file);
     expect(await prisma.bomItem.count({ where: { projectId } })).toBe(2);
+  });
+});
+
+describe("concurrent writers → DB (project write lock)", () => {
+  // Regression: two syncs overlapping (aborted request still running server-
+  // side + a re-click, or watcher + manual sync) both read "component missing"
+  // and both created it — the loser died on the (projectId, refDes) unique
+  // constraint. writeConnectivity/persistPcbLayout now serialize per project.
+  it("parallel netlist parses of the same project all succeed and converge", async () => {
+    const projectId = await makeProject();
+    const file = await writeFixture("board.net", NETLIST);
+
+    await Promise.all([
+      parseNetlistFile(projectId, file),
+      parseNetlistFile(projectId, file),
+      parseNetlistFile(projectId, file),
+    ]);
+
+    expect(await counts(projectId)).toEqual({
+      components: 2,
+      nets: 2,
+      pins: 4,
+      connections: 4,
+    });
+  });
+
+  it("netlist parse racing a layout persist does not duplicate components", async () => {
+    const projectId = await makeProject();
+    const file = await writeFixture("board.net", NETLIST);
+    const layout = {
+      placements: [
+        { refDes: "R1", x: 1, y: 2, rotation: 0, layer: "F.Cu" },
+        { refDes: "U1", x: 3, y: 4, rotation: 90, layer: "F.Cu" },
+      ],
+      board: {
+        widthMm: 10,
+        heightMm: 10,
+        copperLayers: ["F.Cu", "B.Cu"],
+        layerCount: 2,
+        zones: [],
+      },
+    };
+
+    await Promise.all([
+      parseNetlistFile(projectId, file),
+      persistPcbLayout(projectId, layout, "board.kicad_pcb"),
+    ]);
+
+    expect(await prisma.component.count({ where: { projectId } })).toBe(2);
   });
 });
