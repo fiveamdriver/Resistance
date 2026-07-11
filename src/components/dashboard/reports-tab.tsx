@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   SEVERITY_LABEL,
@@ -8,7 +8,7 @@ import {
   type Severity,
 } from "@/lib/review-types";
 
-import type { DashboardVM } from "./view-models";
+import type { DashboardVM, ReviewRunVM } from "./view-models";
 
 /** Normalized finding shape rendered by this tab (from DB or a fresh run). */
 interface ViewFinding {
@@ -26,6 +26,29 @@ interface ReviewState {
   ranAt: string | null; // ISO; null until a run exists
 }
 
+/** Mirror of the server's ReviewProgress (review-service.ts). */
+interface ReviewProgress {
+  round: number;
+  maxRounds: number;
+  phase: string;
+  toolCalls: number;
+  startedAt: number;
+}
+
+interface ReviewStatusPayload {
+  status: "running" | "completed" | "failed" | "none";
+  progress: ReviewProgress | null;
+  run: ReviewRunVM | null;
+}
+
+/** Poll cadence while a review is in flight. */
+const POLL_MS = 2000;
+
+function formatElapsed(startedAt: number): string {
+  const s = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
 // Severity → badge classes (dark theme).
 const SEVERITY_STYLE: Record<Severity, string> = {
   possible_bug: "border-red-500/30 bg-red-500/10 text-red-300",
@@ -37,13 +60,91 @@ const SEVERITY_STYLE: Record<Severity, string> = {
 };
 
 export function ReportsTab({ vm }: { vm: DashboardVM }) {
+  // A failed latest run must not render as "reviewed, zero findings".
+  const lastCompleted =
+    vm.latestReview?.status === "completed" ? vm.latestReview : null;
   const [review, setReview] = useState<ReviewState>(() => ({
-    summary: vm.latestReview?.summary ?? null,
-    findings: vm.latestReview?.findings ?? [],
-    ranAt: vm.latestReview?.createdAt ?? null,
+    summary: lastCompleted?.summary ?? null,
+    findings: lastCompleted?.findings ?? [],
+    ranAt: lastCompleted?.createdAt ?? null,
   }));
   const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<ReviewProgress | null>(null);
+  const [error, setError] = useState<string | null>(
+    vm.latestReview?.status === "failed"
+      ? (vm.latestReview.error ?? "The last review failed. Re-run it.")
+      : null
+  );
+
+  function applyFinishedRun(run: ReviewRunVM) {
+    if (run.status === "completed") {
+      setReview({
+        summary: run.summary,
+        findings: run.findings,
+        ranAt: run.createdAt,
+      });
+      setError(null);
+    } else if (run.status === "failed") {
+      setError(run.error ?? "Review failed. Re-run it.");
+    }
+  }
+
+  // On mount, re-attach: the review runs server-side, so if the user switched
+  // tabs mid-run (unmounting this component) the run kept going. Ask the
+  // server whether one is in flight, or whether a newer result landed.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/projects/${vm.project.id}/review`);
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as ReviewStatusPayload;
+        if (cancelled) return;
+        if (data.status === "running") {
+          setProgress(data.progress);
+          setRunning(true);
+        } else if (data.run) {
+          applyFinishedRun(data.run);
+        }
+      } catch {
+        // Status check is best-effort; the tab still renders the page data.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vm.project.id]);
+
+  // While running, poll for progress and pick up the result when it lands.
+  useEffect(() => {
+    if (!running) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/projects/${vm.project.id}/review`);
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as ReviewStatusPayload;
+        if (cancelled) return;
+        if (data.status === "running") {
+          setProgress(data.progress);
+        } else {
+          if (data.run) applyFinishedRun(data.run);
+          setProgress(null);
+          setRunning(false);
+        }
+      } catch {
+        // Transient poll failure — keep polling.
+      }
+    };
+    const interval = setInterval(tick, POLL_MS);
+    void tick();
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, vm.project.id]);
 
   const stats = [
     { label: "Files", value: vm.files.length },
@@ -60,11 +161,15 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
 
   async function runReview() {
     setRunning(true);
+    setProgress(null);
     setError(null);
     try {
       const res = await fetch(`/api/projects/${vm.project.id}/review`, {
         method: "POST",
       });
+      // Someone (or a previous click) already has a run going — attach to it
+      // via the poll loop instead of erroring.
+      if (res.status === 409) return;
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Review failed");
       setReview({
@@ -72,9 +177,11 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
         findings: (data.findings ?? []) as ViewFinding[],
         ranAt: new Date().toISOString(),
       });
+      setProgress(null);
+      setRunning(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Review failed");
-    } finally {
+      setProgress(null);
       setRunning(false);
     }
   }
@@ -149,9 +256,34 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
       )}
 
       {running && (
-        <div className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-6 text-center text-sm text-[#94a3b8]">
-          Analyzing the board… this can take up to a minute as the reviewer
-          inspects nets, components, and passive values.
+        <div className="space-y-3 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+            <span className="font-medium text-[#F5F0E8]">
+              {progress?.phase ?? "Starting the review"}…
+            </span>
+            {progress && (
+              <span className="text-xs text-[#4a5568]">
+                Round {Math.max(1, progress.round)} of {progress.maxRounds} ·{" "}
+                {progress.toolCalls} tool call
+                {progress.toolCalls === 1 ? "" : "s"} ·{" "}
+                {formatElapsed(progress.startedAt)}
+              </span>
+            )}
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full animate-pulse rounded-full bg-white/70 transition-all duration-700"
+              style={{
+                width: progress
+                  ? `${Math.min(94, Math.max(6, Math.round((progress.round / progress.maxRounds) * 100)))}%`
+                  : "6%",
+              }}
+            />
+          </div>
+          <p className="text-xs text-[#4a5568]">
+            The review runs on the server — switch tabs or keep working, and
+            progress picks up right here when you come back.
+          </p>
         </div>
       )}
 

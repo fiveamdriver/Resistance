@@ -4,7 +4,7 @@
  * surprises) makes the client/server boundary explicit and the components easy
  * to test and reason about.
  */
-import type { Severity } from "@/lib/review-types";
+import { isSeverity, type Severity } from "@/lib/review-types";
 import type { ConnectivityGraph } from "@/types/connectivity";
 
 export interface FileVM {
@@ -65,8 +65,57 @@ export interface ReviewRunVM {
   status: string;
   model: string;
   summary: string | null;
+  /** Failure message when status is "failed", else null. */
+  error: string | null;
   createdAt: string; // ISO string
   findings: FindingVM[];
+}
+
+/**
+ * Map a persisted review run (Prisma shape, structurally typed) to its VM.
+ * Shared by the dashboard server component and the review status endpoint so
+ * both surfaces render the identical shape.
+ */
+export function toReviewRunVM(run: {
+  id: string;
+  status: string;
+  model: string;
+  summary: string | null;
+  error: string | null;
+  createdAt: Date;
+  findings: {
+    id: string;
+    block: string;
+    severity: string;
+    title: string;
+    rationale: string;
+    refDes: string | null;
+    hwReviewRequired: boolean;
+  }[];
+}): ReviewRunVM {
+  return {
+    id: run.id,
+    status: run.status,
+    model: run.model,
+    summary: run.summary,
+    error: run.error,
+    createdAt: run.createdAt.toISOString(),
+    findings: run.findings.map((f) => ({
+      id: f.id,
+      block: f.block,
+      // Stored as a validated string; fall back to "verify" if ever unexpected.
+      severity: isSeverity(f.severity) ? f.severity : "verify",
+      title: f.title,
+      rationale: f.rationale,
+      refDes: f.refDes
+        ? f.refDes
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [],
+      hwReviewRequired: f.hwReviewRequired,
+    })),
+  };
 }
 
 export interface DashboardVM {

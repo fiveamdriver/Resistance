@@ -43,6 +43,42 @@ const RUNNING_STALE_MS = 15 * 60 * 1000;
 
 const CALC_TOOL_NAMES = new Set(calcTools.map((t) => t.name));
 
+// ── Live progress (in-memory, per project) ──────────────────────────────────
+// The review runs server-side inside one POST; the UI polls GET for this so
+// it can show real progress and re-attach after a tab switch. In-memory is
+// sufficient: the app is a single server process, and a crashed run is
+// reaped by the stale-run sweep anyway.
+
+export interface ReviewProgress {
+  /** 1-based agent round currently executing. 0 = pre-flight. */
+  round: number;
+  maxRounds: number;
+  /** Human-readable current activity. */
+  phase: string;
+  /** Tool calls executed so far across all rounds. */
+  toolCalls: number;
+  /** Epoch ms the run started. */
+  startedAt: number;
+}
+
+const progressByProject = new Map<string, ReviewProgress>();
+
+/** Live progress of an in-flight review, or null when none is running. */
+export function getReviewProgress(projectId: string): ReviewProgress | null {
+  return progressByProject.get(projectId) ?? null;
+}
+
+function phaseForTools(names: string[]): string {
+  if (names.includes(SUBMIT_REVIEW_TOOL_NAME)) return "Writing up findings";
+  if (names.some((n) => CALC_TOOL_NAMES.has(n)))
+    return "Verifying passive values";
+  if (
+    names.some((n) => n === "get_component_specs" || n === "search_documents")
+  )
+    return "Checking component specs and datasheets";
+  return "Inspecting nets, components, and connectivity";
+}
+
 const SYSTEM_PROMPT = `\
 You are an automated schematic design-review engine for a single PCB project. \
 You produce an action-item report for a staff/principal EE to act on.
@@ -150,6 +186,15 @@ export async function runReview(
     });
   });
 
+  const progress: ReviewProgress = {
+    round: 0,
+    maxRounds: MAX_ROUNDS,
+    phase: "Fetching component datasheets",
+    toolCalls: 0,
+    startedAt: Date.now(),
+  };
+  progressByProject.set(projectId, progress);
+
   try {
     // Pre-fetch datasheets for all MPNs in the project so get_component_specs
     // has data to return. Skips already-cached entries (< 1ms each). Errors
@@ -180,6 +225,11 @@ export async function runReview(
     for (let round = 0; round < MAX_ROUNDS && !result; round++) {
       // On the last allowed round, force the model to submit what it has.
       const forceSubmit = round === MAX_ROUNDS - 1;
+
+      progress.round = round + 1;
+      progress.phase = forceSubmit
+        ? "Writing up findings"
+        : "Consulting the reviewer";
 
       const resp = await anthropic.messages.create({
         model,
@@ -229,6 +279,9 @@ export async function runReview(
         });
         continue;
       }
+
+      progress.phase = phaseForTools(toolUses.map((b) => b.name));
+      progress.toolCalls += toolUses.length;
 
       const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
       for (const block of toolUses) {
@@ -326,6 +379,8 @@ export async function runReview(
       })
       .catch(() => {});
     throw error;
+  } finally {
+    progressByProject.delete(projectId);
   }
 }
 

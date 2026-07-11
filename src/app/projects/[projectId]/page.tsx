@@ -4,14 +4,14 @@ import { notFound } from "next/navigation";
 import { DashboardTabs } from "@/components/dashboard/dashboard-tabs";
 import { DeleteProjectButton } from "@/components/dashboard/delete-project-button";
 import { KicadFolderCard } from "@/components/dashboard/kicad-folder-card";
-import type {
-  DashboardVM,
-  FileVM,
-  ReviewRunVM,
+import {
+  toReviewRunVM,
+  type DashboardVM,
+  type FileVM,
+  type ReviewRunVM,
 } from "@/components/dashboard/view-models";
 import { NotFoundError } from "@/lib/errors";
 import type { ParseStatus } from "@/lib/fileTypes";
-import { isSeverity } from "@/lib/review-types";
 import { getConnectivityGraph } from "@/server/services/connectivity-service";
 import {
   getProjectDashboard,
@@ -45,7 +45,9 @@ function toViewModel(
   );
   const coveredMpns = new Set(
     project.files
-      .filter((f) => f.verifyStatus === "verified" && f.mpn && designMpns.has(f.mpn))
+      .filter(
+        (f) => f.verifyStatus === "verified" && f.mpn && designMpns.has(f.mpn)
+      )
       .map((f) => f.mpn as string)
   );
   const datasheetCoverage =
@@ -74,7 +76,8 @@ function toViewModel(
         kicadSync = {
           syncedAt: m.syncedAt,
           boardMtime: typeof m.boardMtime === "string" ? m.boardMtime : null,
-          kicadVersion: typeof m.kicadVersion === "string" ? m.kicadVersion : null,
+          kicadVersion:
+            typeof m.kicadVersion === "string" ? m.kicadVersion : null,
           kicadProjectFile:
             typeof m.kicadProjectFile === "string" ? m.kicadProjectFile : null,
         };
@@ -85,30 +88,7 @@ function toViewModel(
   }
 
   const run = project.reviewRuns[0];
-  const latestReview: ReviewRunVM | null = run
-    ? {
-        id: run.id,
-        status: run.status,
-        model: run.model,
-        summary: run.summary,
-        createdAt: run.createdAt.toISOString(),
-        findings: run.findings.map((f) => ({
-          id: f.id,
-          block: f.block,
-          // Stored as a validated string; fall back to "verify" if ever unexpected.
-          severity: isSeverity(f.severity) ? f.severity : "verify",
-          title: f.title,
-          rationale: f.rationale,
-          refDes: f.refDes
-            ? f.refDes
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean)
-            : [],
-          hwReviewRequired: f.hwReviewRequired,
-        })),
-      }
-    : null;
+  const latestReview: ReviewRunVM | null = run ? toReviewRunVM(run) : null;
 
   return {
     project: {
