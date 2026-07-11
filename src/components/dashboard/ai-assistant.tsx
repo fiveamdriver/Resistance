@@ -295,8 +295,9 @@ export function AiAssistant({ projectId }: { projectId: string }) {
   return (
     // Height tracks the viewport so the input bar stays on screen in windowed
     // views (fixed heights hid it below the fold); floor keeps tiny windows
-    // usable. 38rem ≈ the chrome above this panel (header, folder card, tabs).
-    <div className="flex h-[max(20rem,calc(100dvh_-_38rem))] rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)]">
+    // usable. 26rem ≈ chrome above the panel (header, folder card, tabs) plus
+    // a small bottom margin, measured against a ~900px-tall window.
+    <div className="flex h-[max(20rem,calc(100dvh_-_26rem))] rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)]">
       {/* Sidebar — conversation history */}
       <aside className="flex w-48 shrink-0 flex-col border-r border-[rgba(255,255,255,0.06)] sm:w-56">
         <div className="p-2">
