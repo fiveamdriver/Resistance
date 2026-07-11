@@ -1,4 +1,4 @@
-# ⚡ Resistance — AI-Powered Electrical Engineering Project Assistant
+# Resistance — AI-Powered Electrical Engineering Project Assistant
 
 Resistance is a local-first assistant for electrical/hardware engineers. Link a
 KiCad project folder (or upload Altium/KiCad exports — netlists, BOMs,
@@ -11,9 +11,7 @@ assistant + design reviewer whose answers are grounded in your actual board:
 - Does anything exceed its datasheet's absolute maximums?
 - What design-review risks should a human engineer check before spinning?
 
-> The quality bar for this project lives in
-> [`docs/ENGINEERING_STANDARDS.md`](./docs/ENGINEERING_STANDARDS.md).
-> CI enforces typecheck + lint + tests on every push.
+
 
 ---
 
