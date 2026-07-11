@@ -67,9 +67,45 @@ model Project {
   bomItems       BomItem[]
   documentChunks DocumentChunk[]
   reviewRuns     ReviewRun[]
+  conversations  Conversation[]
   board          Board?
 
   @@index([ownerId])
+}
+
+/// An AI-assistant chat thread. Persisted so history survives tab switches
+/// and app restarts, ChatGPT-style; listed in the assistant sidebar.
+model Conversation {
+  id        String   @id @default(cuid())
+  projectId String
+  /// First user message, truncated — the sidebar label.
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([projectId, updatedAt])
+}
+
+/// One user or assistant turn in a conversation. Assistant turns are created
+/// as "pending" when the reply starts generating server-side and flip to
+/// "complete"/"failed" when it settles — that row is what the UI polls, so a
+/// reply keeps working when the user navigates away mid-generation.
+model ChatMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String // "user" | "assistant"
+  content        String
+  /// "complete" | "pending" | "failed" (assistant rows only; user rows are complete)
+  status         String   @default("complete")
+  error          String? // populated when status = "failed"
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }
 
 /// A file uploaded to a project (netlist, BOM, PDF, doc, etc.).

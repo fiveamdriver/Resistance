@@ -1,253 +1,61 @@
 /**
  * POST /api/projects/[id]/assistant
  *
- * Tier-1 grounded-retrieval AI assistant. Runs a tool-use loop against the
- * board-query tools (netlist + BOM data) and streams the final answer as
- * text/plain. All board facts must come from tool results — the system prompt
- * enforces this hard.
+ * Send a chat message. Body: { conversationId?: string, message: string }.
+ * Omitting conversationId starts a new conversation (created from the first
+ * message). The assistant reply is generated server-side before this
+ * resolves — a client that navigated away picks it up by polling the
+ * conversation endpoint instead.
  *
- * Body:   { messages: Anthropic.MessageParam[] }
- * Stream: text/plain, UTF-8
+ * Returns { conversationId, reply } on success.
  */
 import "server-only";
 
-import Anthropic from "@anthropic-ai/sdk";
 import type { NextRequest } from "next/server";
 
-import { boardTools, executeBoardTool } from "@/lib/board-tools";
-import {
-  executeFetchTool,
-  FETCH_TOOL_NAMES,
-  fetchTools,
-} from "@/lib/datasheet-fetch-tool";
-import { EE_TOOL_NAMES, eeTools, executeEeTool } from "@/lib/ee-assistant-tools";
-import { getSettings } from "@/server/services/settings-service";
+import { toUserError } from "@/lib/errors";
+import { sendMessage } from "@/server/services/assistant-service";
 
 export const runtime = "nodejs";
-
-/**
- * Lazy so a missing key fails the request with a clear message instead of
- * constructing a dead client at module load (the key may be configured after
- * the server starts, e.g. via the desktop app's settings).
- */
-function getAnthropicClient(): Anthropic | null {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-}
-
-// ── system prompt — grounding contract ────────────────────────────────────────
-
-const SYSTEM_PROMPT = `\
-You are a board-level EE query engine for a specific PCB project. \
-The reader is a staff or principal engineer. Be terse, accurate, and technical. \
-Lead with the answer. Report refdes and net names verbatim, uppercase.
-
-FORMAT. Answers render as GitHub-flavored markdown. When reporting three or \
-more parallel facts (components on a rail, pin connections, BOM rows, \
-placements, zone lists), use a GFM table with concise headers. Use plain \
-sentences for single facts. Never draw ASCII-art diagrams with box-drawing \
-characters or arrows — use a table or a nested list instead.
-
-GROUNDING CONTRACT — no exceptions:
-
-A. PROVENANCE. Every board fact must come from a tool result. \
-Cite exact identifiers as returned. Format connectivity as: \
-"net 3V3 — 4 pins: U1.1, U2.8, C3.1, C4.1". No claim without the refdes/pin/net that backs it.
-
-B. ABSENT ≠ NEGATIVE. An empty result means "not found in the parsed netlist/BOM," \
-not "not on the physical board." State this explicitly on every empty lookup: \
-e.g. "No pull-up on SDA found in netlist; if one exists it was not captured in the parse."
-
-C. VALUE FIDELITY. Report component values exactly as stored — never normalize "4k7" to \
-"4.7k" or infer tolerance, package, or rating the data does not contain. \
-A null field is "unspecified in source." Do not fill it in.
-
-D. CONNECTIVITY BOUNDARY. "Connected" means same net per the netlist only. \
-Pins on opposite sides of a component are on two different nets and are NOT \
-electrically connected per topology. Never imply DC continuity through components. \
-Label any inference beyond raw netlist topology as "inference — not in netlist."
-
-E. BINARY CONFIDENCE. For board facts: it is in the data (cite the identifier) or \
-it is not (say so plainly). No "probably" for data retrieval. \
-Reserve hedged language only for explicit engineering judgment calls.
-
-F. DOCUMENTS. Use search_documents to retrieve content from the project's \
-verified documents (datasheets, app notes, specs). Search with specific \
-technical terms or part numbers. Every claim taken from a document must cite \
-the source file and page, e.g. "(LM317-datasheet.pdf, p.7)". Results carry a \
-provenance label; for 'web_fetch' documents (found online by part number, \
-not human-vouched), say so when citing: "per a datasheet found online for \
-this part number". If search_documents returns an error, report that document \
-search failed — never treat a failure as "no documents on file".
-
-G. SPEC NUMBERS. For numeric ratings (voltage, current, temperature), prefer \
-get_component_specs (structured, extraction-safe) and use document text as \
-supporting context — PDF table extraction can garble numbers. If a document \
-quote and get_component_specs disagree, surface the conflict explicitly; \
-never silently pick one.
-
-H. NO MODEL MEMORY FOR PARTS. Never answer questions about a specific part's \
-specifications, ratings, pinout, or behavior from your own training knowledge. \
-Distinguish three different "nothing found" cases — never conflate them: \
-(1) SEARCH MISSED: a search_documents call returned zero results. That means \
-no keyword match, not that the information is absent — the document may word \
-it differently. Retry with alternative technical terms or synonyms. \
-(2) DATASHEET NOT INGESTED: if reworded searches still find nothing for a \
-part-specific question, call fetch_datasheet(refdes or mpn) to retrieve and \
-index the part's datasheet, then re-run search_documents. If it returns \
-'quarantined', tell the user the datasheet is on file awaiting their one-click \
-approval in the Files tab — that is NOT the same as "not on file". \
-(3) SEARCHED AND ABSENT: only after reworded searches AND a fetch_datasheet \
-attempt come up empty may you say the information is not on file — then say \
-so plainly and suggest uploading the datasheet. Do not fill the gap from \
-memory in any case.
-
-I. PHYSICAL LAYOUT. Placement and board-geometry facts come ONLY from \
-get_board_dimensions, get_placement, and nearest_components (parsed from the \
-.kicad_pcb). Report positions in mm with the layer (F.Cu = top, B.Cu = bottom) \
-and distances in mm. The netlist has no layout — never infer placement, board \
-size, spacing, or plane coverage from the schematic. If a layout tool returns \
-{ available: false }, say no board layout has been parsed and suggest syncing a \
-KiCad project that includes a .kicad_pcb.`;
-
-// ── route ─────────────────────────────────────────────────────────────────────
-
-const MAX_TOOL_ROUNDS = 6;
-
-/**
- * C2 (EMBEDDINGS_FOR_RAG.md): cap the history forwarded to the API (~12
- * turns). Without this, long chats grow input cost linearly and without
- * bound. The window must still start with a user turn, so leading assistant
- * messages left by the slice are dropped.
- */
-const MAX_HISTORY_MESSAGES = 24;
-
-function capHistory(
-  messages: Anthropic.Messages.MessageParam[],
-): Anthropic.Messages.MessageParam[] {
-  const recent = messages.slice(-MAX_HISTORY_MESSAGES);
-  const firstUser = recent.findIndex((m) => m.role === "user");
-  return firstUser === -1 ? [] : recent.slice(firstUser);
-}
+// A grounded answer can take several tool rounds; give it headroom.
+export const maxDuration = 300;
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: projectId } = await params;
 
-  let body: { messages: Anthropic.Messages.MessageParam[] };
+  let body: { conversationId?: unknown; message?: unknown };
   try {
     body = await request.json();
   } catch {
-    return new Response("Invalid JSON body", { status: 400 });
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-
-  if (!Array.isArray(body?.messages)) {
-    return new Response("body.messages must be an array", { status: 400 });
-  }
-
-  const history = capHistory(body.messages);
-  if (history.length === 0) {
-    return new Response("body.messages must contain a user message", {
-      status: 400,
-    });
-  }
-
-  if (!(await getSettings()).aiEnabled) {
-    return new Response(
-      "AI features are turned off in Settings. Enable them to use the assistant.",
-      { status: 403 },
+  if (typeof body.message !== "string" || !body.message.trim()) {
+    return Response.json(
+      { error: "body.message must be a non-empty string" },
+      { status: 400 }
     );
   }
+  const conversationId =
+    typeof body.conversationId === "string" ? body.conversationId : null;
 
-  const anthropic = getAnthropicClient();
-  if (!anthropic) {
-    return new Response(
-      "The AI assistant is not configured: add your Anthropic API key in settings.",
-      { status: 503 },
-    );
+  try {
+    const result = await sendMessage(projectId, conversationId, body.message);
+    return Response.json(result);
+  } catch (error) {
+    const { code, message } = toUserError(error);
+    const status =
+      code === "NOT_FOUND"
+        ? 404
+        : code === "VALIDATION_ERROR"
+          ? 400
+          : code === "FEATURE_DISABLED"
+            ? 403
+            : code === "CHAT_BUSY"
+              ? 409
+              : 500;
+    return Response.json({ error: message }, { status });
   }
-
-  const encoder = new TextEncoder();
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        const msgs: Anthropic.Messages.MessageParam[] = [...history];
-        let rounds = 0;
-
-        while (true) {
-          const resp = await anthropic.messages.create({
-            model: "claude-sonnet-4-6",
-            max_tokens: 1500,
-            // C1: cache the static prefix. Tools render before system, so a
-            // single breakpoint on the system block caches the tool schemas
-            // AND the prompt — ~90% off those input tokens on every round
-            // after the first (5-min TTL).
-            system: [
-              {
-                type: "text" as const,
-                text: SYSTEM_PROMPT,
-                cache_control: { type: "ephemeral" as const },
-              },
-            ],
-            tools: [...boardTools, ...eeTools, ...fetchTools],
-            messages: msgs,
-          });
-
-          // If stop reason is end_turn, max_tokens, or we've hit the round cap:
-          // extract text and close.
-          if (resp.stop_reason !== "tool_use" || rounds >= MAX_TOOL_ROUNDS) {
-            const text = resp.content
-              .filter((b): b is Anthropic.Messages.TextBlock => b.type === "text")
-              .map((b) => b.text)
-              .join("");
-            controller.enqueue(encoder.encode(text));
-            break;
-          }
-
-          // Collect all tool_use blocks and run them in parallel.
-          const toolBlocks = resp.content.filter(
-            (b): b is Anthropic.Messages.ToolUseBlock => b.type === "tool_use",
-          );
-
-          const toolResults = await Promise.all(
-            toolBlocks.map(async (block) => {
-              const input = block.input as Record<string, unknown>;
-              const result = FETCH_TOOL_NAMES.has(block.name)
-                ? await executeFetchTool(projectId, block.name, input)
-                : EE_TOOL_NAMES.has(block.name)
-                  ? await executeEeTool(projectId, block.name, input)
-                  : await executeBoardTool(projectId, block.name, input);
-              return {
-                type: "tool_result" as const,
-                tool_use_id: block.id,
-                content: JSON.stringify(result),
-              };
-            }),
-          );
-
-          msgs.push({ role: "assistant", content: resp.content });
-          msgs.push({
-            role: "user",
-            content: toolResults as Anthropic.Messages.ToolResultBlockParam[],
-          });
-          rounds++;
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        controller.enqueue(encoder.encode(`[Error: ${msg}]`));
-      } finally {
-        controller.close();
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Transfer-Encoding": "chunked",
-    },
-  });
 }
