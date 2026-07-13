@@ -1,6 +1,48 @@
 import { describe, expect, it } from "vitest";
 
-import { csvLooksLikeBom } from "./bomParser";
+import { buildColumnMap, csvLooksLikeBom } from "./bomParser";
+
+describe("buildColumnMap", () => {
+  // Regression: with both a Manufacturer and an Mfr Part # column, the mpn
+  // alias "manufacturer part number" used to fuzzy-match the Manufacturer
+  // column first, putting manufacturer names in the MPN field. Exact matches
+  // must claim their columns before any fuzzy matching runs.
+  it("keeps manufacturer and MPN apart (HADES_BOM.csv header shape)", () => {
+    const cols = buildColumnMap([
+      "Ref Des",
+      "Qty",
+      "Manufacturer",
+      "Mfr Part #",
+      "Value",
+      "Package",
+      "Type",
+      "Your Instructions / Notes",
+    ]);
+    expect(cols.refDes).toBe(0);
+    expect(cols.quantity).toBe(1);
+    expect(cols.manufacturer).toBe(2);
+    expect(cols.mpn).toBe(3);
+    expect(cols.value).toBe(4);
+    expect(cols.footprint).toBe(5); // "Package"
+  });
+
+  it("still resolves plain KiCad export headers", () => {
+    const cols = buildColumnMap([
+      "Reference",
+      "Value",
+      "Footprint",
+      "Datasheet",
+      "MPN",
+      "QUANTITY",
+    ]);
+    expect(cols.refDes).toBe(0);
+    expect(cols.value).toBe(1);
+    expect(cols.footprint).toBe(2);
+    expect(cols.datasheet).toBe(3);
+    expect(cols.mpn).toBe(4);
+    expect(cols.quantity).toBe(5);
+  });
+});
 
 describe("csvLooksLikeBom", () => {
   it("accepts KiCad BOM export headers", () => {

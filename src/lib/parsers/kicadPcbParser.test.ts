@@ -142,8 +142,10 @@ describe("parseKicadPcbConnectivity", () => {
     const { components, nets } = parseKicadPcbConnectivity(LEGACY_FIXTURE);
 
     expect(components.map((c) => c.refDes).sort()).toEqual(["C13", "H1", "TP1"]);
+    // Board value goes to value, never name — the netlist parse owns name.
     expect(components.find((c) => c.refDes === "C13")).toMatchObject({
-      name: "100nF",
+      name: null,
+      value: "100nF",
       footprint: "Capacitor_SMD:C_0402_1005Metric",
     });
 
@@ -172,7 +174,8 @@ describe("parseKicadPcbConnectivity", () => {
     expect(components).toHaveLength(1);
     expect(components[0]).toMatchObject({
       refDes: "U1",
-      name: "LM358",
+      name: null,
+      value: "LM358",
       footprint: "Package_SO:SOIC-8",
     });
     expect(nets.map((n) => n.name).sort()).toEqual(["GND", "OUT_A"]);

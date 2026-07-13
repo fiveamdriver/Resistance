@@ -354,9 +354,14 @@ export function parseKicadPcbConnectivity(text: string): {
         return legacy ? (legacy[1] ?? legacy[2] ?? null) : null;
       })();
 
+    // The board file's "value" is the value proper ("100n" / "STM32F446").
+    // Never write it to name: this parse runs after the netlist parse in a
+    // sync, and the null-merge update would clobber the netlist's libsource
+    // part name. Display code falls back name → value for board-only parts.
     components.push({
       refDes,
-      name: value,
+      name: null,
+      value: value?.trim() ? value : null,
       footprint,
       mpn: null,
       datasheetUrl: null,

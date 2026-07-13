@@ -43,6 +43,11 @@ export function isKicadNetlist(header: string): boolean {
 // Pure text parser (no I/O) — exported for unit testing
 // ---------------------------------------------------------------------------
 
+/** KiCad writes empty fields as "" (and empty datasheet as "~"). */
+function emptyToNull(v: string | null): string | null {
+  return v === null || v.trim() === "" ? null : v;
+}
+
 export function parseKicadNetlistText(text: string): {
   components: ComponentRecord[];
   nets: NetRecord[];
@@ -75,9 +80,22 @@ export function parseKicadNetlistText(text: string): {
       datasheetUrl = null;
     }
 
+    // KiCad's (value ...) doubles as part name for ICs and value for passives
+    // ("100n"). Keep it as the value proper, and take the name from the
+    // symbol's (libsource (part ...)) — falling back to the value when the
+    // libsource is missing so name never regresses to null.
+    const value = emptyToNull(extractAttr(compBlock, "value"));
+    const libsource = extractBlocks(compBlock, "libsource")[0];
+    const libPart = libsource ? emptyToNull(extractAttr(libsource, "part")) : null;
+    const description = libsource
+      ? emptyToNull(extractAttr(libsource, "description"))
+      : null;
+
     components.push({
       refDes,
-      name: extractAttr(compBlock, "value"),
+      name: libPart ?? value,
+      value,
+      description,
       footprint: extractAttr(compBlock, "footprint"),
       mpn,
       datasheetUrl,

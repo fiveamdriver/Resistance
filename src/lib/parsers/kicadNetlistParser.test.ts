@@ -16,7 +16,8 @@ const FIXTURE = `(export (version "E")
       (footprint "Resistor_SMD:R_0402_1005Metric"))
     (comp (ref "C1")
       (value "100nF")
-      (footprint "Capacitor_SMD:C_0402_1005Metric")))
+      (footprint "Capacitor_SMD:C_0402_1005Metric")
+      (libsource (lib "Device") (part "C_Small") (description "Unpolarized capacitor, small symbol"))))
   (nets
     (net (code "1") (name "GND")
       (node (ref "U1") (pin "5") (pintype "power_in"))
@@ -33,9 +34,12 @@ describe("parseKicadNetlistText", () => {
     const { components } = parseKicadNetlistText(FIXTURE);
 
     expect(components).toHaveLength(3);
+    // No libsource on U1/R1 → name falls back to the value attr.
     expect(components[0]).toEqual({
       refDes: "U1",
       name: "STM32F446RET6",
+      value: "STM32F446RET6",
+      description: null,
       footprint: "Package_QFP:LQFP-64_10x10mm_P0.5mm",
       mpn: null,
       datasheetUrl: null,
@@ -43,13 +47,18 @@ describe("parseKicadNetlistText", () => {
     expect(components[1]).toEqual({
       refDes: "R1",
       name: "10k",
+      value: "10k",
+      description: null,
       footprint: "Resistor_SMD:R_0402_1005Metric",
       mpn: null,
       datasheetUrl: null,
     });
+    // C1 has a libsource → name from (part), value stays the value proper.
     expect(components[2]).toEqual({
       refDes: "C1",
-      name: "100nF",
+      name: "C_Small",
+      value: "100nF",
+      description: "Unpolarized capacitor, small symbol",
       footprint: "Capacitor_SMD:C_0402_1005Metric",
       mpn: null,
       datasheetUrl: null,

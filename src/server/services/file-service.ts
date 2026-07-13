@@ -6,6 +6,8 @@
  */
 import "server-only";
 
+import { unlink } from "fs/promises";
+
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/errors";
 import { categorizeFile } from "@/lib/fileTypes";
@@ -18,10 +20,10 @@ import {
 } from "@/lib/parsers/kicadPcbParser";
 import { isKicadNetlist, parseKicadNetlistFile } from "@/lib/parsers/kicadNetlistParser";
 import { parseNetlistFile } from "@/lib/parsers/netlistParser";
-import { saveUploadedFile } from "@/lib/storage";
+import { resolveStoredPath, saveUploadedFile } from "@/lib/storage";
 import { parseOrThrow, uploadFileMetaSchema } from "@/lib/validation";
 
-import { indexDocumentFile } from "./document-service";
+import { deleteDocumentChunks, indexDocumentFile } from "./document-service";
 import { runDatasheetPasses } from "./ingest-service";
 import { assertProjectExists } from "./project-service";
 
@@ -82,20 +84,50 @@ export async function uploadFiles(
       const stored = await saveUploadedFile(projectId, file);
       absolutePath = stored.absolutePath;
 
-      const record = await prisma.projectFile.create({
-        data: {
-          projectId,
-          originalName: file.name,
-          storedName: stored.storedName,
-          path: stored.relativePath,
-          fileType: file.type || category,
-          category,
-          sizeBytes: stored.sizeBytes,
-          parseStatus: "pending",
-          provenance: opts?.provenance ?? "upload",
-        },
+      // Re-uploading a file the project already has (the app's file identity
+      // is originalName — the folder scan's "already imported" badge keys on
+      // it too) refreshes it in place: adopt the existing record so parsers
+      // that scope row ownership to the fileId (BOM rows, document chunks)
+      // supersede the old rows instead of duplicating them.
+      const provenance = opts?.provenance ?? "upload";
+      const existing = await prisma.projectFile.findFirst({
+        where: { projectId, originalName: file.name, provenance },
+        orderBy: { uploadedAt: "desc" },
       });
-      projectFileId = record.id;
+
+      if (existing) {
+        await deleteDocumentChunks(existing.id);
+        await unlink(resolveStoredPath(existing.path)).catch(() => {});
+        const record = await prisma.projectFile.update({
+          where: { id: existing.id },
+          data: {
+            storedName: stored.storedName,
+            path: stored.relativePath,
+            fileType: file.type || category,
+            category,
+            sizeBytes: stored.sizeBytes,
+            parseStatus: "pending",
+            parseError: null,
+            uploadedAt: new Date(),
+          },
+        });
+        projectFileId = record.id;
+      } else {
+        const record = await prisma.projectFile.create({
+          data: {
+            projectId,
+            originalName: file.name,
+            storedName: stored.storedName,
+            path: stored.relativePath,
+            fileType: file.type || category,
+            category,
+            sizeBytes: stored.sizeBytes,
+            parseStatus: "pending",
+            provenance,
+          },
+        });
+        projectFileId = record.id;
+      }
     } catch (error) {
       outcomes.push({
         fileName: file.name,

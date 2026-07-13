@@ -146,7 +146,7 @@ export async function getNet(
     pins: connections.map((c) => ({
       refdes: c.pin.component.refDes,
       pin: c.pin.number,
-      component: c.pin.component.name ?? null,
+      component: c.pin.component.name ?? c.pin.component.value ?? null,
     })),
   };
 }

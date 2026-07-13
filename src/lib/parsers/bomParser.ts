@@ -66,6 +66,8 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   mpn: [
     "mpn",
     "manufacturer part number",
+    "manufacturer part #",
+    "mfr part #",
     "part number",
     "part no",
     "part#",
@@ -81,34 +83,6 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   datasheet: ["datasheet", "datasheet url", "datasheet link"],
 };
 
-/**
- * Given the CSV headers (as-is) and an alias list, return the column index or
- * -1 if not found. Tries exact case-insensitive match first, then substring.
- * Substring matches require ≥3 chars on both sides — telemetry-style headers
- * ("v", "q", "r") must never claim "value"/"quantity"/"ref".
- */
-function resolveColumn(headers: string[], aliases: string[]): number {
-  const lower = headers.map((h) => h.toLowerCase().trim());
-
-  // Exact match (case-insensitive)
-  for (const alias of aliases) {
-    const idx = lower.indexOf(alias.toLowerCase());
-    if (idx !== -1) return idx;
-  }
-
-  // Partial / contains match
-  for (const alias of aliases) {
-    const a = alias.toLowerCase();
-    if (a.length < 3) continue;
-    const idx = lower.findIndex(
-      (h) => h.length >= 3 && (h.includes(a) || a.includes(h))
-    );
-    if (idx !== -1) return idx;
-  }
-
-  return -1;
-}
-
 interface ColumnMap {
   refDes: number;
   description: number;
@@ -120,17 +94,64 @@ interface ColumnMap {
   datasheet: number;
 }
 
-function buildColumnMap(headers: string[]): ColumnMap {
-  return {
-    refDes: resolveColumn(headers, COLUMN_ALIASES.refDes),
-    description: resolveColumn(headers, COLUMN_ALIASES.description),
-    manufacturer: resolveColumn(headers, COLUMN_ALIASES.manufacturer),
-    mpn: resolveColumn(headers, COLUMN_ALIASES.mpn),
-    value: resolveColumn(headers, COLUMN_ALIASES.value),
-    footprint: resolveColumn(headers, COLUMN_ALIASES.footprint),
-    quantity: resolveColumn(headers, COLUMN_ALIASES.quantity),
-    datasheet: resolveColumn(headers, COLUMN_ALIASES.datasheet),
-  };
+const COLUMN_FIELDS = [
+  "refDes",
+  "description",
+  "manufacturer",
+  "mpn",
+  "value",
+  "footprint",
+  "quantity",
+  "datasheet",
+] as const;
+
+/**
+ * Map each logical field to a header column. Two passes across ALL fields:
+ * every exact (case-insensitive) match is claimed first, then fuzzy substring
+ * matching runs only over unclaimed columns. The pass split matters: with
+ * headers like "Manufacturer, Mfr Part #", the mpn alias "manufacturer part
+ * number" fuzzy-matches the Manufacturer column, so manufacturer names would
+ * land in the MPN field unless exact matches claim their columns up front.
+ * Substring matches require ≥3 chars on both sides — telemetry-style headers
+ * ("v", "q", "r") must never claim "value"/"quantity"/"ref".
+ */
+export function buildColumnMap(headers: string[]): ColumnMap {
+  const lower = headers.map((h) => h.toLowerCase().trim());
+  const map = {} as ColumnMap;
+  const claimed = new Set<number>();
+
+  // Pass 1: exact matches (in field priority order, first alias wins)
+  for (const field of COLUMN_FIELDS) {
+    map[field] = -1;
+    for (const alias of COLUMN_ALIASES[field]) {
+      const idx = lower.indexOf(alias.toLowerCase());
+      if (idx !== -1 && !claimed.has(idx)) {
+        map[field] = idx;
+        claimed.add(idx);
+        break;
+      }
+    }
+  }
+
+  // Pass 2: partial / contains matches over the leftover columns
+  for (const field of COLUMN_FIELDS) {
+    if (map[field] !== -1) continue;
+    for (const alias of COLUMN_ALIASES[field]) {
+      const a = alias.toLowerCase();
+      if (a.length < 3) continue;
+      const idx = lower.findIndex(
+        (h, i) =>
+          !claimed.has(i) && h.length >= 3 && (h.includes(a) || a.includes(h))
+      );
+      if (idx !== -1) {
+        map[field] = idx;
+        claimed.add(idx);
+        break;
+      }
+    }
+  }
+
+  return map;
 }
 
 // ---------------------------------------------------------------------------

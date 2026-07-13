@@ -55,6 +55,10 @@ export interface ComponentRecord {
   footprint: string | null;
   name: string | null;
   mpn: string | null;
+  /** Component value proper (KiCad "value" attr), e.g. "100n", "10k". */
+  value?: string | null;
+  /** Human description (KiCad libsource description), if the format has one. */
+  description?: string | null;
   /** Datasheet URL from the design (KiCad "Datasheet" property), if any. */
   datasheetUrl?: string | null;
 }
@@ -210,6 +214,8 @@ export async function writeConnectivity(
       if (c.name != null) prev.name = c.name;
       if (c.footprint != null) prev.footprint = c.footprint;
       if (c.mpn != null) prev.mpn = c.mpn;
+      if (c.value != null) prev.value = c.value;
+      if (c.description != null) prev.description = c.description;
       if (c.datasheetUrl != null) prev.datasheetUrl = c.datasheetUrl;
     }
   }
@@ -261,6 +267,8 @@ export async function writeConnectivity(
             name: true,
             footprint: true,
             mpn: true,
+            value: true,
+            description: true,
             datasheetUrl: true,
           },
         });
@@ -294,6 +302,8 @@ export async function writeConnectivity(
               name: c.name,
               footprint: c.footprint,
               mpn: c.mpn,
+              value: c.value ?? null,
+              description: c.description ?? null,
               datasheetUrl: c.datasheetUrl ?? null,
             })),
             select: { id: true, refDes: true },
@@ -304,7 +314,10 @@ export async function writeConnectivity(
           const fresh = freshComponents.get(existing.refDes);
           if (!fresh) continue;
           const patch: Partial<
-            Record<"name" | "footprint" | "mpn" | "datasheetUrl", string>
+            Record<
+              "name" | "footprint" | "mpn" | "value" | "description" | "datasheetUrl",
+              string
+            >
           > = {};
           if (fresh.name != null && fresh.name !== existing.name)
             patch.name = fresh.name;
@@ -312,6 +325,13 @@ export async function writeConnectivity(
             patch.footprint = fresh.footprint;
           if (fresh.mpn != null && fresh.mpn !== existing.mpn)
             patch.mpn = fresh.mpn;
+          if (fresh.value != null && fresh.value !== existing.value)
+            patch.value = fresh.value;
+          if (
+            fresh.description != null &&
+            fresh.description !== existing.description
+          )
+            patch.description = fresh.description;
           if (
             fresh.datasheetUrl != null &&
             fresh.datasheetUrl !== existing.datasheetUrl
