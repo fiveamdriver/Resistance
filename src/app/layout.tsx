@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import DitheringBackground from "@/components/home/dithering-background";
+import SiteHeader from "@/components/site-header";
+import { ThemeProvider, themeInitScript } from "@/components/theme-provider";
 
 import "./globals.css";
 
@@ -19,40 +20,18 @@ export default function RootLayout({
   // logo points straight there; on the web it stays the marketing hero.
   const homeHref = process.env.RESISTANCE_LOCAL_TOKEN ? "/projects" : "/";
   return (
-    <html lang="en" className="bg-[#050505]" style={{ backgroundColor: '#050505' }}>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,301,400,401,500,501,700,701,900,901&display=swap" rel="stylesheet" />
+        {/* eslint-disable-next-line react/no-danger -- anti-flash theme init, must run before paint */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="min-h-screen bg-[#050505]">
-        <header className="sticky top-0 z-50">
-          <div className="flex w-full items-center justify-between px-8 py-5 xl:px-16">
-            <Link href={homeHref} className="text-[32px] font-bold tracking-tight text-[#F5F0E8]">
-              Resistance
-            </Link>
-            <nav className="flex items-center gap-6 text-sm">
-              <Link
-                href="/projects"
-                className="text-[#4a5568] transition-colors hover:text-[#94a3b8]"
-              >
-                Projects
-              </Link>
-              <Link
-                href="/settings"
-                className="text-[#4a5568] transition-colors hover:text-[#94a3b8]"
-              >
-                Settings
-              </Link>
-              <Link
-                href="/projects/new"
-                className="rounded border border-[rgba(255,255,255,0.15)] px-4 py-1.5 bg-[#F5F0E8] text-black transition-colors hover:border-[rgba(255,255,255,0.3)] hover:text-black"
-              >
-                New Project
-              </Link>
-            </nav>
-          </div>
-        </header>
-        <DitheringBackground />
-        <main className="relative z-10">{children}</main>
+      <body className="min-h-screen">
+        <ThemeProvider>
+          <SiteHeader homeHref={homeHref} />
+          <DitheringBackground />
+          <main className="relative z-10">{children}</main>
+        </ThemeProvider>
       </body>
     </html>
   );

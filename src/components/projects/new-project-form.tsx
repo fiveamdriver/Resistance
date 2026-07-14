@@ -16,7 +16,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-md bg-[#F5F0E8] px-5 py-2.5 font-semibold text-black transition-all hover:bg-[#F5F0E8]/90 disabled:cursor-not-allowed disabled:opacity-60"
+      className="rounded-md bg-[var(--accent-bg)] px-5 py-2.5 font-semibold text-[var(--accent-fg)] transition-all hover:bg-[var(--accent-bg-hover)] disabled:cursor-not-allowed disabled:opacity-60"
     >
       {pending ? "Creating…" : "Create project"}
     </button>
@@ -31,14 +31,14 @@ export function NewProjectForm() {
       {state.error && (
         <div
           role="alert"
-          className="rounded-md border border-red-500/30 bg-red-950/20 px-4 py-3 text-sm text-red-400"
+          className="rounded-md border border-red-500/30 bg-red-100 dark:bg-red-950/20 px-4 py-3 text-sm text-red-700 dark:text-red-400"
         >
           {state.error}
         </div>
       )}
 
       <div className="space-y-1.5">
-        <label htmlFor="name" className="block text-sm font-medium text-[#94a3b8]">
+        <label htmlFor="name" className="block text-sm font-medium text-[var(--fg-muted)]">
           Project name
         </label>
         <input
@@ -48,19 +48,19 @@ export function NewProjectForm() {
           required
           maxLength={120}
           placeholder="e.g. Power Board Rev B"
-          className="w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-[#F5F0E8] placeholder:text-[#2a2a35] outline-none transition focus:border-[rgba(255,255,255,0.3)] focus:ring-1 focus:ring-[rgba(255,255,255,0.1)]"
+          className="w-full rounded-md border border-[rgba(var(--overlay-rgb),0.1)] bg-[rgba(var(--overlay-rgb),0.03)] px-3 py-2 text-[var(--fg)] placeholder:text-[#2a2a35] outline-none transition focus:border-[rgba(var(--overlay-rgb),0.3)] focus:ring-1 focus:ring-[rgba(var(--overlay-rgb),0.1)]"
         />
         {state.fieldErrors?.name?.map((msg) => (
-          <p key={msg} className="text-xs text-red-400">
+          <p key={msg} className="text-xs text-red-700 dark:text-red-400">
             {msg}
           </p>
         ))}
       </div>
 
       <div className="space-y-1.5">
-        <label htmlFor="description" className="block text-sm font-medium text-[#94a3b8]">
+        <label htmlFor="description" className="block text-sm font-medium text-[var(--fg-muted)]">
           Description{" "}
-          <span className="text-[#4a5568]">(optional)</span>
+          <span className="text-[var(--fg-subtle)]">(optional)</span>
         </label>
         <textarea
           id="description"
@@ -68,10 +68,10 @@ export function NewProjectForm() {
           rows={3}
           maxLength={2000}
           placeholder="Short description of the board / system"
-          className="w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-[#F5F0E8] placeholder:text-[#2a2a35] outline-none transition focus:border-[rgba(255,255,255,0.3)] focus:ring-1 focus:ring-[rgba(255,255,255,0.1)]"
+          className="w-full rounded-md border border-[rgba(var(--overlay-rgb),0.1)] bg-[rgba(var(--overlay-rgb),0.03)] px-3 py-2 text-[var(--fg)] placeholder:text-[#2a2a35] outline-none transition focus:border-[rgba(var(--overlay-rgb),0.3)] focus:ring-1 focus:ring-[rgba(var(--overlay-rgb),0.1)]"
         />
         {state.fieldErrors?.description?.map((msg) => (
-          <p key={msg} className="text-xs text-red-400">
+          <p key={msg} className="text-xs text-red-700 dark:text-red-400">
             {msg}
           </p>
         ))}

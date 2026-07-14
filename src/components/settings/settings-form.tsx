@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 
 import type { AppSettings } from "@/server/services/settings-service";
 import type { KicadCliDetection } from "@/lib/kicad-cli";
+import { useTheme } from "@/components/theme-provider";
 
 interface Props {
   initialSettings: AppSettings;
@@ -43,8 +44,8 @@ function Toggle({
   return (
     <div className="flex items-start justify-between gap-6 py-4">
       <div>
-        <p className="font-medium text-[#F5F0E8]">{label}</p>
-        <p className="mt-1 text-sm text-[#94a3b8]">{description}</p>
+        <p className="font-medium text-[var(--fg)]">{label}</p>
+        <p className="mt-1 text-sm text-[var(--fg-muted)]">{description}</p>
       </div>
       <button
         type="button"
@@ -53,11 +54,11 @@ function Toggle({
         aria-label={label}
         onClick={() => onChange(!checked)}
         className={`relative mt-1 h-6 w-11 shrink-0 rounded-full transition-colors ${
-          checked ? "bg-[#2dd4bf]" : "bg-[rgba(255,255,255,0.15)]"
+          checked ? "bg-[#2dd4bf]" : "bg-[rgba(var(--overlay-rgb),0.15)]"
         }`}
       >
         <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-[#F5F0E8] transition-transform ${
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--accent-bg)] transition-transform ${
             checked ? "translate-x-[22px]" : "translate-x-0.5"
           }`}
         />
@@ -74,14 +75,15 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-8 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-6">
-      <h2 className="text-lg font-semibold text-[#F5F0E8]">{title}</h2>
+    <section className="mt-8 rounded-lg border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(var(--overlay-rgb),0.03)] p-6">
+      <h2 className="text-lg font-semibold text-[var(--fg)]">{title}</h2>
       {children}
     </section>
   );
 }
 
 export function SettingsForm({ initialSettings, initialKicadDetection }: Props) {
+  const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState(initialSettings);
   const [error, setError] = useState<string | null>(null);
 
@@ -158,21 +160,30 @@ export function SettingsForm({ initialSettings, initialKicadDetection }: Props) 
   return (
     <div>
       {error && (
-        <div className="mt-4 rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+        <div className="mt-4 rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
           {error}
         </div>
       )}
 
+      <Section title="Appearance">
+        <Toggle
+          checked={theme === "dark"}
+          onChange={(dark) => setTheme(dark ? "dark" : "light")}
+          label="Dark mode"
+          description="Switch between the light (cream) and dark theme."
+        />
+      </Section>
+
       <Section title="AI & data sharing">
-        <div className="mt-3 space-y-2 rounded-md border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] p-4 text-sm text-[#94a3b8]">
-          <p className="font-medium text-[#F5F0E8]">What leaves this machine</p>
+        <div className="mt-3 space-y-2 rounded-md border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(var(--overlay-rgb),0.02)] p-4 text-sm text-[var(--fg-muted)]">
+          <p className="font-medium text-[var(--fg)]">What leaves this machine</p>
           <p>
-            <span className="text-[#F5F0E8]">AI assistant and design review</span>{" "}
+            <span className="text-[var(--fg)]">AI assistant and design review</span>{" "}
             send your board data — netlist, BOM, component and net details — to
             the Anthropic API to answer questions and produce findings.
           </p>
           <p>
-            <span className="text-[#F5F0E8]">Datasheet lookup</span> sends part
+            <span className="text-[var(--fg)]">Datasheet lookup</span> sends part
             numbers (MPNs) to the Anthropic API, which searches the web for
             datasheets, and downloads PDFs directly from manufacturer and
             distributor sites (your part numbers appear in those requests).
@@ -184,7 +195,7 @@ export function SettingsForm({ initialSettings, initialKicadDetection }: Props) 
           </p>
         </div>
 
-        <div className="mt-2 divide-y divide-[rgba(255,255,255,0.06)]">
+        <div className="mt-2 divide-y divide-[rgba(var(--overlay-rgb),0.06)]">
           <Toggle
             label="AI features"
             description="Assistant, design review, and datasheet spec lookup. Off = Resistance is a purely local design-data organizer."
@@ -202,18 +213,18 @@ export function SettingsForm({ initialSettings, initialKicadDetection }: Props) 
 
       {desktop && (
         <Section title="Anthropic API key">
-          <p className="mt-2 text-sm text-[#94a3b8]">
+          <p className="mt-2 text-sm text-[var(--fg-muted)]">
             AI features run on your own Anthropic account. The key is stored
             encrypted by the operating system (Keychain on macOS) and never
             written to disk in plaintext.
           </p>
           <p className="mt-3 text-sm">
             {keyConfigured === null ? (
-              <span className="text-[#4a5568]">Checking…</span>
+              <span className="text-[var(--fg-subtle)]">Checking…</span>
             ) : keyConfigured ? (
               <span className="text-[#2dd4bf]">✓ A key is configured</span>
             ) : (
-              <span className="text-amber-400">
+              <span className="text-amber-700 dark:text-amber-400">
                 No key configured — AI features are unavailable until you add
                 one
               </span>
@@ -226,26 +237,26 @@ export function SettingsForm({ initialSettings, initialKicadDetection }: Props) 
               onChange={(e) => setKeyInput(e.target.value)}
               placeholder="sk-ant-…"
               autoComplete="off"
-              className="flex-1 rounded-md border border-[rgba(255,255,255,0.1)] bg-black/30 px-3 py-2 text-sm text-[#F5F0E8] placeholder:text-[#4a5568] focus:border-[rgba(255,255,255,0.3)] focus:outline-none"
+              className="flex-1 rounded-md border border-[rgba(var(--overlay-rgb),0.1)] bg-[var(--inset-bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--fg-subtle)] focus:border-[rgba(var(--overlay-rgb),0.3)] focus:outline-none"
             />
             <button
               type="button"
               onClick={() => void saveApiKey()}
               disabled={keySaving || !keyInput.trim()}
-              className="rounded-md bg-[#F5F0E8] px-4 py-2 text-sm font-semibold text-black transition-all hover:bg-[#F5F0E8]/90 disabled:opacity-40"
+              className="rounded-md bg-[var(--accent-bg)] px-4 py-2 text-sm font-semibold text-[var(--accent-fg)] transition-all hover:bg-[var(--accent-bg-hover)] disabled:opacity-40"
             >
               {keySaving ? "Saving…" : keyConfigured ? "Replace key" : "Save key"}
             </button>
           </div>
-          <p className="mt-2 text-xs text-[#4a5568]">
+          <p className="mt-2 text-xs text-[var(--fg-subtle)]">
             Saving restarts the local backend so the key takes effect.
           </p>
         </Section>
       )}
 
       <Section title="KiCad command-line tool">
-        <p className="mt-2 text-sm text-[#94a3b8]">
-          Resistance uses <code className="text-[#F5F0E8]">kicad-cli</code>{" "}
+        <p className="mt-2 text-sm text-[var(--fg-muted)]">
+          Resistance uses <code className="text-[var(--fg)]">kicad-cli</code>{" "}
           (bundled with KiCad) to import projects directly from KiCad folders.
         </p>
         <p className="mt-3 text-sm">
@@ -256,9 +267,9 @@ export function SettingsForm({ initialSettings, initialKicadDetection }: Props) 
               {kicad.cli.source === "override" && " (manual path)"}
             </span>
           ) : kicad.overrideError ? (
-            <span className="text-red-400">{kicad.overrideError}</span>
+            <span className="text-red-700 dark:text-red-400">{kicad.overrideError}</span>
           ) : (
-            <span className="text-amber-400">
+            <span className="text-amber-700 dark:text-amber-400">
               kicad-cli was not found. Install KiCad, or set the path manually
               below.
             </span>
@@ -270,14 +281,14 @@ export function SettingsForm({ initialSettings, initialKicadDetection }: Props) 
             value={kicadPathInput}
             onChange={(e) => setKicadPathInput(e.target.value)}
             placeholder="Manual path, e.g. /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
-            className="flex-1 rounded-md border border-[rgba(255,255,255,0.1)] bg-black/30 px-3 py-2 text-sm text-[#F5F0E8] placeholder:text-[#4a5568] focus:border-[rgba(255,255,255,0.3)] focus:outline-none"
+            className="flex-1 rounded-md border border-[rgba(var(--overlay-rgb),0.1)] bg-[var(--inset-bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--fg-subtle)] focus:border-[rgba(var(--overlay-rgb),0.3)] focus:outline-none"
           />
           {desktop && (
             <button
               type="button"
               onClick={() => void browseKicadCli()}
               disabled={kicadBusy}
-              className="rounded-md border border-[rgba(255,255,255,0.15)] px-4 py-2 text-sm text-[#F5F0E8] transition-colors hover:border-[rgba(255,255,255,0.3)] disabled:opacity-40"
+              className="rounded-md border border-[rgba(var(--overlay-rgb),0.15)] px-4 py-2 text-sm text-[var(--fg)] transition-colors hover:border-[rgba(var(--overlay-rgb),0.3)] disabled:opacity-40"
             >
               Browse…
             </button>
@@ -286,7 +297,7 @@ export function SettingsForm({ initialSettings, initialKicadDetection }: Props) 
             type="button"
             onClick={() => void saveKicadPath(kicadPathInput.trim() || null)}
             disabled={kicadBusy}
-            className="rounded-md bg-[#F5F0E8] px-4 py-2 text-sm font-semibold text-black transition-all hover:bg-[#F5F0E8]/90 disabled:opacity-40"
+            className="rounded-md bg-[var(--accent-bg)] px-4 py-2 text-sm font-semibold text-[var(--accent-fg)] transition-all hover:bg-[var(--accent-bg-hover)] disabled:opacity-40"
           >
             {kicadBusy ? "Checking…" : "Save"}
           </button>
@@ -296,7 +307,7 @@ export function SettingsForm({ initialSettings, initialKicadDetection }: Props) 
             type="button"
             onClick={() => void saveKicadPath(null)}
             disabled={kicadBusy}
-            className="mt-2 text-xs text-[#94a3b8] underline-offset-2 hover:underline disabled:opacity-40"
+            className="mt-2 text-xs text-[var(--fg-muted)] underline-offset-2 hover:underline disabled:opacity-40"
           >
             Clear manual path and auto-detect
           </button>

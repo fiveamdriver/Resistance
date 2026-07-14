@@ -315,7 +315,7 @@ function NetNode({ data }: NodeProps) {
             padding: "0 4px",
             borderRadius: 8,
             color: d.highFanout ? "#0a0a0a" : "#94a3b8",
-            background: d.highFanout ? "#f59e0b" : "rgba(255,255,255,0.06)",
+            background: d.highFanout ? "#f59e0b" : "rgba(var(--overlay-rgb),0.06)",
           }}
         >
           {d.fanout}
@@ -341,8 +341,8 @@ function ChipNode({ data }: NodeProps) {
       style={{
         padding: "4px 10px",
         borderRadius: 13,
-        border: "1px dashed rgba(255,255,255,0.18)",
-        background: "rgba(255,255,255,0.03)",
+        border: "1px dashed rgba(var(--overlay-rgb),0.18)",
+        background: "rgba(var(--overlay-rgb),0.03)",
         color: "#64748b",
         fontFamily: "monospace",
         fontSize: 10,
@@ -367,10 +367,10 @@ const CONTROLS_STYLE = {
   boxShadow: "none",
   "--xy-controls-button-background-color-default": "rgba(8,8,8,0.95)",
   "--xy-controls-button-background-color-hover-default":
-    "rgba(255,255,255,0.06)",
+    "rgba(var(--overlay-rgb),0.06)",
   "--xy-controls-button-color-default": "#64748b",
   "--xy-controls-button-color-hover-default": "#e2e8f0",
-  "--xy-controls-button-border-color-default": "rgba(255,255,255,0.07)",
+  "--xy-controls-button-border-color-default": "rgba(var(--overlay-rgb),0.07)",
   "--xy-controls-box-shadow-default": "none",
 } as CSSProperties;
 
@@ -1086,7 +1086,7 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
     <div className={isFullscreen ? "flex h-full flex-col gap-2" : "space-y-2"}>
       {/* Mode switch + search + controls */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex overflow-hidden rounded border border-[rgba(255,255,255,0.08)]">
+        <div className="flex overflow-hidden rounded border border-[rgba(var(--overlay-rgb),0.08)]">
           {(Object.keys(MODE_LABEL) as ViewMode[]).map((m) => (
             <button
               key={m}
@@ -1121,10 +1121,10 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
               }
             }}
             placeholder="Search U12, SPI_CLK…"
-            className="w-44 rounded border border-[rgba(255,255,255,0.08)] bg-[rgba(8,8,8,0.95)] px-2 py-1 font-mono text-xs text-[#e2e8f0] placeholder-[#3f4a5c] outline-none focus:border-[rgba(96,165,250,0.4)]"
+            className="w-44 rounded border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(8,8,8,0.95)] px-2 py-1 font-mono text-xs text-[#e2e8f0] placeholder-[#3f4a5c] outline-none focus:border-[rgba(96,165,250,0.4)]"
           />
           {searchOpen && results.length > 0 && (
-            <div className="absolute left-0 top-full z-20 mt-1 w-64 overflow-hidden rounded border border-[rgba(255,255,255,0.1)] bg-[rgba(10,10,12,0.97)] shadow-lg backdrop-blur">
+            <div className="absolute left-0 top-full z-20 mt-1 w-64 overflow-hidden rounded border border-[rgba(var(--overlay-rgb),0.1)] bg-[rgba(10,10,12,0.97)] shadow-lg backdrop-blur">
               {results.map((r) => (
                 <button
                   key={r.id}
@@ -1145,7 +1145,7 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
                   </span>
                   <span className="font-semibold">{r.label}</span>
                   {r.sub && (
-                    <span className="truncate text-[#4a5568]">{r.sub}</span>
+                    <span className="truncate text-[var(--fg-subtle)]">{r.sub}</span>
                   )}
                 </button>
               ))}
@@ -1160,7 +1160,7 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
               className={`rounded border px-2 py-1 text-xs font-medium transition-colors ${
                 showPowerPins
                   ? "border-[rgba(96,165,250,0.5)] bg-[rgba(96,165,250,0.12)] text-[#93c5fd]"
-                  : "border-[rgba(255,255,255,0.08)] bg-[rgba(8,8,8,0.95)] text-[#64748b] hover:text-[#e2e8f0]"
+                  : "border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(8,8,8,0.95)] text-[#64748b] hover:text-[#e2e8f0]"
               }`}
             >
               {showPowerPins ? "Hide power/GND pins" : "Show power/GND pins"}
@@ -1173,7 +1173,7 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
               className={`rounded border px-2 py-1 text-xs font-medium transition-colors ${
                 hideJumpers
                   ? "border-[rgba(245,158,11,0.5)] bg-[rgba(245,158,11,0.12)] text-[#fbbf24]"
-                  : "border-[rgba(255,255,255,0.08)] bg-[rgba(8,8,8,0.95)] text-[#64748b] hover:text-[#e2e8f0]"
+                  : "border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(8,8,8,0.95)] text-[#64748b] hover:text-[#e2e8f0]"
               }`}
             >
               {hideJumpers ? "Include jumpers" : "Ignore jumpers/DNP"}
@@ -1182,7 +1182,7 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
           <button
             onClick={() => setIsFullscreen((v) => !v)}
             title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
-            className="rounded border border-[rgba(255,255,255,0.08)] bg-[rgba(8,8,8,0.95)] p-1.5 text-[#64748b] transition-colors hover:border-[rgba(255,255,255,0.15)] hover:text-[#e2e8f0]"
+            className="rounded border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(8,8,8,0.95)] p-1.5 text-[#64748b] transition-colors hover:border-[rgba(var(--overlay-rgb),0.15)] hover:text-[#e2e8f0]"
           >
             {isFullscreen ? (
               <svg
@@ -1214,12 +1214,12 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
       </div>
 
       {/* Breadcrumbs (focus mode) + legend */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#4a5568]">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--fg-subtle)]">
         {mode === "focus" && crumbs.length > 0 ? (
           <div className="flex flex-wrap items-center gap-1 font-mono">
             <button
               onClick={() => setMode("overview")}
-              className="rounded px-1.5 py-0.5 text-[#64748b] hover:bg-[rgba(255,255,255,0.05)] hover:text-[#e2e8f0]"
+              className="rounded px-1.5 py-0.5 text-[#64748b] hover:bg-[rgba(var(--overlay-rgb),0.05)] hover:text-[#e2e8f0]"
             >
               Overview
             </button>
@@ -1234,7 +1234,7 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
                   className={`rounded px-1.5 py-0.5 ${
                     c === focusId
                       ? "bg-[rgba(96,165,250,0.12)] text-[#93c5fd]"
-                      : "text-[#64748b] hover:bg-[rgba(255,255,255,0.05)] hover:text-[#e2e8f0]"
+                      : "text-[#64748b] hover:bg-[rgba(var(--overlay-rgb),0.05)] hover:text-[#e2e8f0]"
                   }`}
                 >
                   {c.slice(2)}
@@ -1261,20 +1261,20 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
 
       {/* Graph */}
       <div
-        className="relative overflow-hidden rounded-lg border border-[rgba(255,255,255,0.08)]"
+        className="relative overflow-hidden rounded-lg border border-[rgba(var(--overlay-rgb),0.08)]"
         style={isFullscreen ? { flex: 1 } : { height: 480 }}
       >
         {emptyFocus ? (
-          <div className="flex h-full items-center justify-center text-xs text-[#4a5568]">
+          <div className="flex h-full items-center justify-center text-xs text-[var(--fg-subtle)]">
             Search a part or net above, or click any node, to focus on it.
           </div>
         ) : emptyOverview ? (
-          <div className="flex h-full items-center justify-center px-8 text-center text-xs text-[#4a5568]">
+          <div className="flex h-full items-center justify-center px-8 text-center text-xs text-[var(--fg-subtle)]">
             No ICs or connectors recognized in this netlist — try Focus mode
             via search instead.
           </div>
         ) : emptyPower ? (
-          <div className="flex h-full items-center justify-center px-8 text-center text-xs text-[#4a5568]">
+          <div className="flex h-full items-center justify-center px-8 text-center text-xs text-[var(--fg-subtle)]">
             No power rails recognized (no VIN/VBAT/3V3/5V-style net names).
           </div>
         ) : (
@@ -1292,35 +1292,35 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
             nodesDraggable={false}
             nodesConnectable={false}
             elementsSelectable={false}
-            style={{ background: "#050505" }}
+            style={{ background: "var(--bg)" }}
           >
             <Background
               variant={BackgroundVariant.Dots}
               gap={20}
               size={0.75}
-              color="rgba(255,255,255,0.04)"
+              color="rgba(var(--overlay-rgb),0.04)"
             />
             <Controls
               showInteractive={false}
               style={CONTROLS_STYLE}
-              className="overflow-hidden rounded border border-[rgba(255,255,255,0.08)] bg-[rgba(8,8,8,0.95)]"
+              className="overflow-hidden rounded border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(8,8,8,0.95)]"
             />
           </ReactFlow>
         )}
 
         {/* Detail panel */}
         {(detail || edgeDetail) && (
-          <div className="absolute right-3 top-3 max-h-[calc(100%-24px)] w-64 overflow-y-auto rounded-lg border border-[rgba(255,255,255,0.1)] bg-[rgba(10,10,12,0.92)] p-3 text-xs backdrop-blur">
+          <div className="absolute right-3 top-3 max-h-[calc(100%-24px)] w-64 overflow-y-auto rounded-lg border border-[rgba(var(--overlay-rgb),0.1)] bg-[rgba(10,10,12,0.92)] p-3 text-xs backdrop-blur">
             {detail && (
               <>
                 <div className="font-mono text-sm font-bold text-[#f1f5f9]">
                   {detail.title}
                 </div>
-                <div className="mt-0.5 text-[#94a3b8]">{detail.role}</div>
+                <div className="mt-0.5 text-[var(--fg-muted)]">{detail.role}</div>
                 <div className="mt-2 space-y-1">
                   {detail.rows.map((r) => (
                     <div key={r.k} className="flex gap-2">
-                      <span className="w-16 shrink-0 text-[#4a5568]">
+                      <span className="w-16 shrink-0 text-[var(--fg-subtle)]">
                         {r.k}
                       </span>
                       <span className="font-mono text-[#cbd5e1]">{r.v}</span>
@@ -1328,8 +1328,8 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
                   ))}
                 </div>
                 {detail.pinRows && detail.pinRows.length > 0 && (
-                  <div className="mt-2 border-t border-[rgba(255,255,255,0.06)] pt-2">
-                    <div className="mb-1 text-[#4a5568]">connections</div>
+                  <div className="mt-2 border-t border-[rgba(var(--overlay-rgb),0.06)] pt-2">
+                    <div className="mb-1 text-[var(--fg-subtle)]">connections</div>
                     <div className="space-y-0.5">
                       {detail.pinRows.map(([pin, net], i) => (
                         <div key={i} className="flex gap-2 font-mono">
@@ -1351,7 +1351,7 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
                 <div className="font-mono text-sm font-bold text-[#f1f5f9]">
                   {edgeDetail.title}
                 </div>
-                <div className="mt-0.5 text-[#94a3b8]">
+                <div className="mt-0.5 text-[var(--fg-muted)]">
                   {edgeDetail.links.length}{" "}
                   {edgeDetail.links.length === 1 ? "net" : "nets"} between
                   these blocks
@@ -1376,7 +1376,7 @@ export function ConnectivityTab({ graph }: { graph: ConnectivityGraph }) {
 
   if (isFullscreen) {
     return (
-      <div className="fixed inset-0 z-[9999] flex flex-col bg-[#050505] p-4">
+      <div className="fixed inset-0 z-[9999] flex flex-col bg-[var(--bg)] p-4">
         {inner}
       </div>
     );

@@ -8,17 +8,17 @@ import remarkGfm from "remark-gfm";
 // GFM tables are the main event; keep everything tight and readable.
 const markdownComponents: Components = {
   h1: ({ children }) => (
-    <div className="mb-1 mt-2 text-sm font-semibold text-[#c8d3e0]">
+    <div className="mb-1 mt-2 text-sm font-semibold text-[var(--fg)]">
       {children}
     </div>
   ),
   h2: ({ children }) => (
-    <div className="mb-1 mt-2 text-sm font-semibold text-[#c8d3e0]">
+    <div className="mb-1 mt-2 text-sm font-semibold text-[var(--fg)]">
       {children}
     </div>
   ),
   h3: ({ children }) => (
-    <div className="mb-1 mt-2 text-[13px] font-semibold text-[#c8d3e0]">
+    <div className="mb-1 mt-2 text-[13px] font-semibold text-[var(--fg)]">
       {children}
     </div>
   ),
@@ -30,26 +30,26 @@ const markdownComponents: Components = {
     <ol className="my-1 list-decimal space-y-0.5 pl-5">{children}</ol>
   ),
   strong: ({ children }) => (
-    <strong className="font-semibold text-[#c8d3e0]">{children}</strong>
+    <strong className="font-semibold text-[var(--fg)]">{children}</strong>
   ),
   code: ({ children }) => (
-    <code className="rounded bg-[rgba(255,255,255,0.07)] px-1 py-0.5 font-mono text-[12px] text-[#c8d3e0]">
+    <code className="rounded bg-[rgba(var(--overlay-rgb),0.07)] px-1 py-0.5 font-mono text-[12px] text-[var(--fg)]">
       {children}
     </code>
   ),
   pre: ({ children }) => (
-    <pre className="my-2 overflow-x-auto rounded-md bg-[rgba(255,255,255,0.05)] p-2 font-mono text-[12px]">
+    <pre className="my-2 overflow-x-auto rounded-md bg-[rgba(var(--overlay-rgb),0.05)] p-2 font-mono text-[12px]">
       {children}
     </pre>
   ),
-  hr: () => <hr className="my-2 border-[rgba(255,255,255,0.08)]" />,
+  hr: () => <hr className="my-2 border-[rgba(var(--overlay-rgb),0.08)]" />,
   table: ({ children }) => (
     <div className="my-2 overflow-x-auto">
       <table className="w-full border-collapse text-[13px]">{children}</table>
     </div>
   ),
   thead: ({ children }) => (
-    <thead className="border-b border-[rgba(255,255,255,0.15)] text-[#c8d3e0]">
+    <thead className="border-b border-[rgba(var(--overlay-rgb),0.15)] text-[var(--fg)]">
       {children}
     </thead>
   ),
@@ -57,7 +57,7 @@ const markdownComponents: Components = {
     <th className="px-2 py-1 text-left font-semibold">{children}</th>
   ),
   tr: ({ children }) => (
-    <tr className="border-b border-[rgba(255,255,255,0.06)] last:border-0">
+    <tr className="border-b border-[rgba(var(--overlay-rgb),0.06)] last:border-0">
       {children}
     </tr>
   ),
@@ -297,20 +297,20 @@ export function AiAssistant({ projectId }: { projectId: string }) {
     // views (fixed heights hid it below the fold); floor keeps tiny windows
     // usable. 26rem ≈ chrome above the panel (header, folder card, tabs) plus
     // a small bottom margin, measured against a ~900px-tall window.
-    <div className="flex h-[max(20rem,calc(100dvh_-_26rem))] rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)]">
+    <div className="flex h-[max(20rem,calc(100dvh_-_26rem))] rounded-lg border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(var(--overlay-rgb),0.03)]">
       {/* Sidebar — conversation history */}
-      <aside className="flex w-48 shrink-0 flex-col border-r border-[rgba(255,255,255,0.06)] sm:w-56">
+      <aside className="flex w-48 shrink-0 flex-col border-r border-[rgba(var(--overlay-rgb),0.06)] sm:w-56">
         <div className="p-2">
           <button
             onClick={newChat}
-            className="w-full rounded-md border border-[rgba(255,255,255,0.1)] px-3 py-1.5 text-sm text-[#F5F0E8] transition-colors hover:border-brand hover:text-brand"
+            className="w-full rounded-md border border-[rgba(var(--overlay-rgb),0.1)] px-3 py-1.5 text-sm text-[var(--fg)] transition-colors hover:border-brand hover:text-brand"
           >
             + New chat
           </button>
         </div>
         <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
           {conversations.length === 0 && (
-            <p className="px-1 pt-2 text-xs text-[#4a5568]">
+            <p className="px-1 pt-2 text-xs text-[var(--fg-subtle)]">
               No conversations yet.
             </p>
           )}
@@ -319,8 +319,8 @@ export function AiAssistant({ projectId }: { projectId: string }) {
               key={c.id}
               className={`group flex items-center gap-1 rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
                 c.id === activeId
-                  ? "bg-[rgba(255,255,255,0.08)] text-[#F5F0E8]"
-                  : "text-[#94a3b8] hover:bg-[rgba(255,255,255,0.04)]"
+                  ? "bg-[rgba(var(--overlay-rgb),0.08)] text-[var(--fg)]"
+                  : "text-[var(--fg-muted)] hover:bg-[rgba(var(--overlay-rgb),0.04)]"
               }`}
             >
               <button
@@ -329,14 +329,14 @@ export function AiAssistant({ projectId }: { projectId: string }) {
                 title={c.title}
               >
                 <span className="block truncate">{c.title}</span>
-                <span className="block text-[11px] text-[#4a5568]">
+                <span className="block text-[11px] text-[var(--fg-subtle)]">
                   {relativeTime(c.updatedAt)}
                 </span>
               </button>
               <button
                 onClick={() => void removeConversation(c.id)}
                 title="Delete conversation"
-                className="hidden shrink-0 rounded px-1 text-[#4a5568] hover:text-red-300 group-hover:block"
+                className="hidden shrink-0 rounded px-1 text-[var(--fg-subtle)] hover:text-red-700 dark:text-red-300 group-hover:block"
               >
                 ×
               </button>
@@ -350,7 +350,7 @@ export function AiAssistant({ projectId }: { projectId: string }) {
         <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">
           {messages.length === 0 && !pending && (
             <div className="text-left">
-              <span className="inline-block max-w-[80%] rounded-lg border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-[#94a3b8]">
+              <span className="inline-block max-w-[80%] rounded-lg border border-[rgba(var(--overlay-rgb),0.06)] bg-[rgba(var(--overlay-rgb),0.04)] px-3 py-2 text-sm text-[var(--fg-muted)]">
                 Ask a question about your design. Conversations are saved in the
                 sidebar so you can pick them back up any time.
               </span>
@@ -364,10 +364,10 @@ export function AiAssistant({ projectId }: { projectId: string }) {
               <span
                 className={`inline-block max-w-[80%] rounded-lg px-3 py-2 text-sm ${
                   m.role === "user"
-                    ? "whitespace-pre-wrap bg-brand text-[#F5F0E8]"
+                    ? "whitespace-pre-wrap bg-brand text-white"
                     : m.status === "failed"
-                      ? "border border-red-500/30 bg-red-500/10 text-red-300"
-                      : "border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.04)] text-[#94a3b8]"
+                      ? "border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
+                      : "border border-[rgba(var(--overlay-rgb),0.06)] bg-[rgba(var(--overlay-rgb),0.04)] text-[var(--fg-muted)]"
                 }`}
               >
                 {m.role === "assistant" ? (
@@ -389,17 +389,17 @@ export function AiAssistant({ projectId }: { projectId: string }) {
           ))}
           {pending && (
             <div className="text-left">
-              <span className="inline-block max-w-[80%] rounded-lg border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-[#94a3b8]">
+              <span className="inline-block max-w-[80%] rounded-lg border border-[rgba(var(--overlay-rgb),0.06)] bg-[rgba(var(--overlay-rgb),0.04)] px-3 py-2 text-sm text-[var(--fg-muted)]">
                 <span className="mr-1 inline-block animate-pulse">▋</span>
                 {progress?.phase ?? "Thinking"}…
                 {progress && (
-                  <span className="ml-2 text-xs text-[#4a5568]">
+                  <span className="ml-2 text-xs text-[var(--fg-subtle)]">
                     {progress.toolCalls} tool call
                     {progress.toolCalls === 1 ? "" : "s"} ·{" "}
                     {formatElapsed(progress.startedAt)}
                   </span>
                 )}
-                <span className="mt-1 block text-xs text-[#4a5568]">
+                <span className="mt-1 block text-xs text-[var(--fg-subtle)]">
                   Runs on the server — switch tabs freely; the answer will be
                   here when you come back.
                 </span>
@@ -408,9 +408,9 @@ export function AiAssistant({ projectId }: { projectId: string }) {
           )}
         </div>
 
-        <div className="border-t border-[rgba(255,255,255,0.06)] p-3">
+        <div className="border-t border-[rgba(var(--overlay-rgb),0.06)] p-3">
           {error && (
-            <p className="mb-2 text-xs text-red-300" role="alert">
+            <p className="mb-2 text-xs text-red-700 dark:text-red-300" role="alert">
               {error}
             </p>
           )}
@@ -420,7 +420,7 @@ export function AiAssistant({ projectId }: { projectId: string }) {
                 <button
                   key={s}
                   onClick={() => void send(s)}
-                  className="rounded-full border border-[rgba(255,255,255,0.08)] px-2.5 py-1 text-xs text-[#94a3b8] transition-colors hover:border-brand hover:text-brand"
+                  className="rounded-full border border-[rgba(var(--overlay-rgb),0.08)] px-2.5 py-1 text-xs text-[var(--fg-muted)] transition-colors hover:border-brand hover:text-brand"
                 >
                   {s}
                 </button>
@@ -439,12 +439,12 @@ export function AiAssistant({ projectId }: { projectId: string }) {
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about your project…"
               disabled={pending}
-              className="flex-1 rounded-md border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-sm text-[#F5F0E8] placeholder:text-[#2a2a35] outline-none transition focus:border-[rgba(255,255,255,0.3)] focus:ring-1 focus:ring-[rgba(255,255,255,0.1)] disabled:opacity-50"
+              className="flex-1 rounded-md border border-[rgba(var(--overlay-rgb),0.1)] bg-[rgba(var(--overlay-rgb),0.03)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[#2a2a35] outline-none transition focus:border-[rgba(var(--overlay-rgb),0.3)] focus:ring-1 focus:ring-[rgba(var(--overlay-rgb),0.1)] disabled:opacity-50"
             />
             <button
               type="submit"
               disabled={pending}
-              className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-[#F5F0E8] transition-colors hover:bg-brand-dark disabled:opacity-50"
+              className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark disabled:opacity-50"
             >
               Send
             </button>

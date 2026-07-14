@@ -23,8 +23,8 @@ function ComponentNode({ data }: NodeProps) {
   return (
     <div style={{
       padding: "7px 12px", borderRadius: 5, fontFamily: "monospace", userSelect: "none",
-      border: `1px solid ${d.focal ? "rgba(74,158,255,0.5)" : "rgba(255,255,255,0.11)"}`,
-      background: d.focal ? "rgba(74,158,255,0.07)" : "rgba(255,255,255,0.025)",
+      border: `1px solid ${d.focal ? "rgba(74,158,255,0.5)" : "rgba(var(--overlay-rgb),0.11)"}`,
+      background: d.focal ? "rgba(74,158,255,0.07)" : "rgba(var(--overlay-rgb),0.025)",
       boxShadow: d.focal ? "0 0 16px rgba(74,158,255,0.12)" : "none",
     }}>
       <Handle type="target" position={Position.Left}   {...HANDLE} />

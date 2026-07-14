@@ -26,9 +26,9 @@ export default function ScrollNav() {
     >
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
         {onFirst ? (
-          <path d="M5 7.5L10 12.5L15 7.5" stroke="#F5F0E8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M5 7.5L10 12.5L15 7.5" stroke="var(--fg)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         ) : (
-          <path d="M15 12.5L10 7.5L5 12.5" stroke="#F5F0E8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M15 12.5L10 7.5L5 12.5" stroke="var(--fg)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         )}
       </svg>
     </button>

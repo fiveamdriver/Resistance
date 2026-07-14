@@ -10,7 +10,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-8 pt-6">
-      <h1 className="text-2xl font-bold text-[#F5F0E8]">Settings</h1>
+      <h1 className="text-2xl font-bold text-[var(--fg)]">Settings</h1>
       <SettingsForm
         initialSettings={settings}
         initialKicadDetection={kicadDetection}

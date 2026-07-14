@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 
 function KBVisual() {
   return (
-    <div className="w-full rounded-xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.02)] p-4 font-mono text-xs text-[#94a3b8]">
-      <div className="mb-3 flex items-center gap-2 rounded border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.03)] px-3 py-2">
+    <div className="w-full rounded-xl border border-[rgba(var(--overlay-rgb),0.07)] bg-[rgba(var(--overlay-rgb),0.02)] p-4 font-mono text-xs text-[var(--fg-muted)]">
+      <div className="mb-3 flex items-center gap-2 rounded border border-[rgba(var(--overlay-rgb),0.07)] bg-[rgba(var(--overlay-rgb),0.03)] px-3 py-2">
         <span className="text-[#93c5fd]">⌕</span>
         <span className="text-[#93c5fd]">&quot;U7 bypass&quot;</span>
         <span className="ml-2 text-[#3f3f4f]">— 3 results</span>
@@ -31,13 +31,13 @@ function KBVisual() {
           >
             <span className="text-[rgba(96,165,250,0.4)]">{f.icon}</span>
             <span>{f.name}</span>
-            <span className="ml-auto rounded border border-[rgba(255,255,255,0.06)] px-1 py-0.5 text-[10px] text-[#3f3f4f]">
+            <span className="ml-auto rounded border border-[rgba(var(--overlay-rgb),0.06)] px-1 py-0.5 text-[10px] text-[#3f3f4f]">
               {f.tag}
             </span>
           </div>
         ))}
       </div>
-      <div className="mt-3 border-t border-[rgba(255,255,255,0.05)] pt-3">
+      <div className="mt-3 border-t border-[rgba(var(--overlay-rgb),0.05)] pt-3">
         <div className="text-[#93c5fd]">C45, C46, C47</div>
         <div className="mt-0.5 text-[#3f3f4f]">refdes · net: +3V3_PERIPH · U7 pin 14 (VDD)</div>
       </div>
@@ -54,7 +54,7 @@ function ConnectivityVisual() {
     { x: 140, y: 25,  label: "+5V", sub: "PWR" },
   ];
   return (
-    <div className="w-full overflow-hidden rounded-xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.02)] p-4">
+    <div className="w-full overflow-hidden rounded-xl border border-[rgba(var(--overlay-rgb),0.07)] bg-[rgba(var(--overlay-rgb),0.02)] p-4">
       <div className="mb-2 font-mono text-[10px] text-[#3f3f4f]">
         Connectivity: U7 → neighbors (5 connections)
       </div>
@@ -91,8 +91,8 @@ function ConnectivityVisual() {
         {nodes.map((n) => (
           <g key={`node-${n.label}`}>
             <circle cx={n.x} cy={n.y} r={16}
-              fill="rgba(255,255,255,0.03)"
-              stroke="rgba(255,255,255,0.1)"
+              fill="rgba(var(--overlay-rgb),0.03)"
+              stroke="rgba(var(--overlay-rgb),0.1)"
               strokeWidth={1} />
             <text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle"
               fill="#93c5fd" fontSize={9} fontFamily="monospace">{n.label}</text>
@@ -113,17 +113,17 @@ function BOMVisual() {
   ];
   const rowBg: Record<Status, string> = {
     ok: "",
-    warn: "bg-amber-950/20",
-    error: "bg-red-950/20",
+    warn: "bg-amber-100 dark:bg-amber-950/20",
+    error: "bg-red-100 dark:bg-red-950/20",
   };
   const statusColor: Record<Status, string> = {
     ok: "text-[#93c5fd]",
-    warn: "text-amber-400",
-    error: "text-red-400",
+    warn: "text-amber-700 dark:text-amber-400",
+    error: "text-red-700 dark:text-red-400",
   };
   return (
-    <div className="w-full overflow-hidden rounded-xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.02)]">
-      <div className="flex gap-2 border-b border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.03)] px-4 py-2 font-mono text-[10px] text-[#3f3f4f]">
+    <div className="w-full overflow-hidden rounded-xl border border-[rgba(var(--overlay-rgb),0.07)] bg-[rgba(var(--overlay-rgb),0.02)]">
+      <div className="flex gap-2 border-b border-[rgba(var(--overlay-rgb),0.05)] bg-[rgba(var(--overlay-rgb),0.03)] px-4 py-2 font-mono text-[10px] text-[#3f3f4f]">
         <span className="w-9">Ref</span>
         <span className="flex-1">MPN</span>
         <span className="w-12">Value</span>
@@ -133,11 +133,11 @@ function BOMVisual() {
       {rows.map((r) => (
         <div
           key={r.ref}
-          className={`flex items-center gap-2 border-b border-[rgba(255,255,255,0.04)] px-4 py-2 font-mono text-[11px] ${rowBg[r.status]}`}
+          className={`flex items-center gap-2 border-b border-[rgba(var(--overlay-rgb),0.04)] px-4 py-2 font-mono text-[11px] ${rowBg[r.status]}`}
         >
           <span className="w-9 text-[#60a5fa]">{r.ref}</span>
-          <span className="flex-1 truncate text-[#94a3b8]">{r.mpn}</span>
-          <span className="w-12 text-[#94a3b8]">{r.val}</span>
+          <span className="flex-1 truncate text-[var(--fg-muted)]">{r.mpn}</span>
+          <span className="w-12 text-[var(--fg-muted)]">{r.val}</span>
           <span className="w-6 text-right text-[#3f3f4f]">{r.qty}</span>
           <span className={`w-20 text-right text-[10px] ${statusColor[r.status]}`}>
             {r.status === "ok" ? "✓ matched" : r.status === "warn" ? "⚠ mfr?" : "✗ no MPN"}
@@ -146,8 +146,8 @@ function BOMVisual() {
       ))}
       <div className="px-4 py-2 font-mono text-[10px] text-[#3f3f4f]">
         128 total · 124 matched ·{" "}
-        <span className="text-amber-400">3 warnings</span> ·{" "}
-        <span className="text-red-400">1 error</span>
+        <span className="text-amber-700 dark:text-amber-400">3 warnings</span> ·{" "}
+        <span className="text-red-700 dark:text-red-400">1 error</span>
       </div>
     </div>
   );
@@ -155,7 +155,7 @@ function BOMVisual() {
 
 function AIVisual() {
   return (
-    <div className="w-full rounded-xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.02)] p-4 font-mono text-xs">
+    <div className="w-full rounded-xl border border-[rgba(var(--overlay-rgb),0.07)] bg-[rgba(var(--overlay-rgb),0.02)] p-4 font-mono text-xs">
       <div className="space-y-3">
         <div className="flex justify-end">
           <div className="max-w-[80%] rounded-lg rounded-tr-none border border-[rgba(96,165,250,0.2)] bg-[rgba(96,165,250,0.06)] px-3 py-2 text-[#93c5fd]">
@@ -163,7 +163,7 @@ function AIVisual() {
           </div>
         </div>
         <div className="flex">
-          <div className="max-w-[90%] space-y-1 rounded-lg rounded-tl-none border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-[#94a3b8]">
+          <div className="max-w-[90%] space-y-1 rounded-lg rounded-tl-none border border-[rgba(var(--overlay-rgb),0.06)] bg-[rgba(var(--overlay-rgb),0.03)] px-3 py-2 text-[var(--fg-muted)]">
             <div className="mb-1.5 text-[#93c5fd]">U7 pin 4 — net: SPI_CLK</div>
             <div>· <span className="text-[#60a5fa]">R12</span> pin 1</div>
             <div>· <span className="text-[#60a5fa]">U3</span> pin 23 (SCK)</div>
@@ -171,7 +171,7 @@ function AIVisual() {
             <div className="mt-1.5 text-[#3f3f4f]">3 connections on SPI_CLK</div>
           </div>
         </div>
-        <div className="flex items-center gap-2 rounded border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-3 py-2 text-[#2a2a35]">
+        <div className="flex items-center gap-2 rounded border border-[rgba(var(--overlay-rgb),0.06)] bg-[rgba(var(--overlay-rgb),0.02)] px-3 py-2 text-[#2a2a35]">
           <span>Ask about your design…</span>
           <span className="ml-auto text-[rgba(96,165,250,0.2)]">⏎</span>
         </div>
@@ -237,10 +237,10 @@ export default function FeatureTabs() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex flex-col items-center gap-2 text-center">
           <Badge variant="outline">Engineering Intelligence</Badge>
-          <h2 className="max-w-2xl text-xl font-semibold text-[#F5F0E8] md:text-2xl">
+          <h2 className="max-w-2xl text-xl font-semibold text-[var(--fg)] md:text-2xl">
             Know your design. Navigate it.
           </h2>
-          <p className="max-w-xl text-xs text-[#94a3b8]">
+          <p className="max-w-xl text-xs text-[var(--fg-muted)]">
             Purpose-built tools for electrical engineers working with complex PCB
             projects — from first schematic capture to design review.
           </p>
@@ -252,7 +252,7 @@ export default function FeatureTabs() {
               <Tabs.Trigger
                 key={tab.value}
                 value={tab.value}
-                className="flex items-center gap-2 rounded-lg border border-[rgba(255,255,255,0.1)] px-3 py-2 text-sm font-medium text-[#94a3b8] outline-none transition-all hover:border-[rgba(255,255,255,0.25)] hover:text-[#F5F0E8] data-[state=active]:border-[rgba(255,255,255,0.3)] data-[state=active]:bg-[rgba(255,255,255,0.06)] data-[state=active]:text-[#F5F0E8]"
+                className="flex items-center gap-2 rounded-lg border border-[rgba(var(--overlay-rgb),0.1)] px-3 py-2 text-sm font-medium text-[var(--fg-muted)] outline-none transition-all hover:border-[rgba(var(--overlay-rgb),0.25)] hover:text-[var(--fg)] data-[state=active]:border-[rgba(var(--overlay-rgb),0.3)] data-[state=active]:bg-[rgba(var(--overlay-rgb),0.06)] data-[state=active]:text-[var(--fg)]"
               >
                 {tab.icon}
                 {tab.label}
@@ -260,7 +260,7 @@ export default function FeatureTabs() {
             ))}
           </Tabs.List>
 
-          <div className="mx-auto mt-4 max-w-5xl rounded-2xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.02)] p-3 lg:p-4">
+          <div className="mx-auto mt-4 max-w-5xl rounded-2xl border border-[rgba(var(--overlay-rgb),0.07)] bg-[rgba(var(--overlay-rgb),0.02)] p-3 lg:p-4">
             {TABS.map((tab) => (
               <Tabs.Content
                 key={tab.value}
@@ -271,13 +271,13 @@ export default function FeatureTabs() {
                   <Badge variant="outline" className="w-fit">
                     {tab.badge}
                   </Badge>
-                  <h3 className="text-base font-semibold text-[#F5F0E8] lg:text-lg">
+                  <h3 className="text-base font-semibold text-[var(--fg)] lg:text-lg">
                     {tab.title}
                   </h3>
-                  <p className="text-xs text-[#94a3b8]">{tab.description}</p>
+                  <p className="text-xs text-[var(--fg-muted)]">{tab.description}</p>
                   <Link
                     href="/projects"
-                    className="mt-1 w-fit rounded-md bg-[#F5F0E8] px-4 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-[#F5F0E8]/90"
+                    className="mt-1 w-fit rounded-md bg-[var(--accent-bg)] px-4 py-1.5 text-xs font-semibold text-[var(--accent-fg)] transition-colors hover:bg-[var(--accent-bg-hover)]"
                   >
                     {tab.buttonText}
                   </Link>

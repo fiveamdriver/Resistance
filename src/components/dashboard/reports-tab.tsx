@@ -49,14 +49,14 @@ function formatElapsed(startedAt: number): string {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
-// Severity → badge classes (dark theme).
+// Severity → badge classes.
 const SEVERITY_STYLE: Record<Severity, string> = {
-  possible_bug: "border-red-500/30 bg-red-500/10 text-red-300",
-  verify: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-  watch: "border-sky-500/30 bg-sky-500/10 text-sky-300",
-  minor: "border-slate-500/30 bg-slate-500/10 text-slate-300",
-  cosmetic: "border-slate-500/30 bg-slate-500/10 text-slate-400",
-  ok: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+  possible_bug: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
+  verify: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  watch: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+  minor: "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+  cosmetic: "border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-400",
+  ok: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
 };
 
 export function ReportsTab({ vm }: { vm: DashboardVM }) {
@@ -211,10 +211,10 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
         {stats.map((s) => (
           <div
             key={s.label}
-            className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4 text-center"
+            className="rounded-lg border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(var(--overlay-rgb),0.03)] p-4 text-center"
           >
-            <div className="text-2xl font-bold text-[#F5F0E8]">{s.value}</div>
-            <div className="text-xs uppercase tracking-wide text-[#4a5568]">
+            <div className="text-2xl font-bold text-[var(--fg)]">{s.value}</div>
+            <div className="text-xs uppercase tracking-wide text-[var(--fg-subtle)]">
               {s.label}
             </div>
           </div>
@@ -222,15 +222,15 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
       </div>
 
       {/* Action bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(var(--overlay-rgb),0.03)] p-4">
         <div>
-          <p className="font-medium text-[#F5F0E8]">AI Design Review</p>
-          <p className="mt-0.5 text-sm text-[#94a3b8]">
+          <p className="font-medium text-[var(--fg)]">AI Design Review</p>
+          <p className="mt-0.5 text-sm text-[var(--fg-muted)]">
             Discovers functional blocks, verifies passive values, and flags
             action items from your parsed netlist and BOM.
           </p>
           {review.ranAt && (
-            <p className="mt-1 text-xs text-[#4a5568]">
+            <p className="mt-1 text-xs text-[var(--fg-subtle)]">
               Last run {new Date(review.ranAt).toLocaleString()}
             </p>
           )}
@@ -238,7 +238,7 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
         <button
           onClick={runReview}
           disabled={running || !hasParsedData}
-          className="rounded-md bg-white px-4 py-2 text-sm font-semibold text-black transition-all hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-[var(--accent-bg)] px-4 py-2 text-sm font-semibold text-[var(--accent-fg)] transition-all hover:bg-[var(--accent-bg-hover)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {running
             ? "Analyzing…"
@@ -249,20 +249,20 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
       </div>
 
       {!hasParsedData && (
-        <p className="text-sm text-[#94a3b8]">
+        <p className="text-sm text-[var(--fg-muted)]">
           Upload and parse a netlist or BOM first — the review runs on parsed
           board data.
         </p>
       )}
 
       {running && (
-        <div className="space-y-3 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
+        <div className="space-y-3 rounded-lg border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(var(--overlay-rgb),0.03)] p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-            <span className="font-medium text-[#F5F0E8]">
+            <span className="font-medium text-[var(--fg)]">
               {progress?.phase ?? "Starting the review"}…
             </span>
             {progress && (
-              <span className="text-xs text-[#4a5568]">
+              <span className="text-xs text-[var(--fg-subtle)]">
                 Round {Math.max(1, progress.round)} of {progress.maxRounds} ·{" "}
                 {progress.toolCalls} tool call
                 {progress.toolCalls === 1 ? "" : "s"} ·{" "}
@@ -270,9 +270,9 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
               </span>
             )}
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div className="h-1.5 overflow-hidden rounded-full bg-[rgba(var(--overlay-rgb),0.1)]">
             <div
-              className="h-full animate-pulse rounded-full bg-white/70 transition-all duration-700"
+              className="h-full animate-pulse rounded-full bg-[var(--fg)] opacity-70 transition-all duration-700"
               style={{
                 width: progress
                   ? `${Math.min(94, Math.max(6, Math.round((progress.round / progress.maxRounds) * 100)))}%`
@@ -280,7 +280,7 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
               }}
             />
           </div>
-          <p className="text-xs text-[#4a5568]">
+          <p className="text-xs text-[var(--fg-subtle)]">
             The review runs on the server — switch tabs or keep working, and
             progress picks up right here when you come back.
           </p>
@@ -290,7 +290,7 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
       {error && (
         <div
           role="alert"
-          className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+          className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300"
         >
           {error}
         </div>
@@ -300,27 +300,27 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
       {!running && review.ranAt && (
         <div className="space-y-4">
           {review.summary && (
-            <div className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4 text-sm text-[#cbd5e1]">
+            <div className="rounded-lg border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(var(--overlay-rgb),0.03)] p-4 text-sm text-[var(--fg-muted)]">
               {review.summary}
             </div>
           )}
 
           {review.findings.length === 0 ? (
-            <p className="text-sm text-[#94a3b8]">
+            <p className="text-sm text-[var(--fg-muted)]">
               No findings were raised. (Severity scale: Possible bug · Verify ·
               Watch · Minor · Cosmetic · OK.)
             </p>
           ) : (
             grouped.map((group) => (
               <div key={group.block} className="space-y-2">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-[#94a3b8]">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--fg-muted)]">
                   {group.block}
                 </h3>
                 <ul className="space-y-2">
                   {group.findings.map((f, i) => (
                     <li
                       key={`${group.block}-${i}`}
-                      className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4"
+                      className="rounded-lg border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(var(--overlay-rgb),0.03)] p-4"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span
@@ -329,15 +329,15 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
                           {SEVERITY_LABEL[f.severity]}
                         </span>
                         {f.hwReviewRequired && (
-                          <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-300">
+                          <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
                             HW review
                           </span>
                         )}
-                        <span className="font-medium text-[#F5F0E8]">
+                        <span className="font-medium text-[var(--fg)]">
                           {f.title}
                         </span>
                       </div>
-                      <p className="mt-2 text-sm text-[#cbd5e1]">
+                      <p className="mt-2 text-sm text-[var(--fg-muted)]">
                         {f.rationale}
                       </p>
                       {f.refDes.length > 0 && (
@@ -345,7 +345,7 @@ export function ReportsTab({ vm }: { vm: DashboardVM }) {
                           {f.refDes.map((r) => (
                             <span
                               key={r}
-                              className="rounded border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.04)] px-1.5 py-0.5 font-mono text-xs text-[#94a3b8]"
+                              className="rounded border border-[rgba(var(--overlay-rgb),0.1)] bg-[rgba(var(--overlay-rgb),0.04)] px-1.5 py-0.5 font-mono text-xs text-[var(--fg-muted)]"
                             >
                               {r}
                             </span>

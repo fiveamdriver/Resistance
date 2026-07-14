@@ -43,18 +43,18 @@ export function DeleteProjectButton({ projectId, projectName }: Props) {
         <button
           type="button"
           onClick={() => setArmed(true)}
-          className="text-xs text-[#4a5568] underline-offset-2 hover:text-red-400 hover:underline"
+          className="text-xs text-[var(--fg-subtle)] underline-offset-2 hover:text-red-700 dark:text-red-400 hover:underline"
         >
           Delete project…
         </button>
-        {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+        {error && <p className="mt-1 text-xs text-red-700 dark:text-red-400">{error}</p>}
       </div>
     );
   }
 
   return (
     <div className="flex items-center gap-2 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1.5">
-      <span className="text-xs text-red-400">
+      <span className="text-xs text-red-700 dark:text-red-400">
         Delete &ldquo;{projectName}&rdquo; and all its data?
       </span>
       <button
@@ -69,7 +69,7 @@ export function DeleteProjectButton({ projectId, projectName }: Props) {
         type="button"
         onClick={() => setArmed(false)}
         disabled={busy}
-        className="text-xs text-[#94a3b8] hover:text-[#F5F0E8]"
+        className="text-xs text-[var(--fg-muted)] hover:text-[var(--fg)]"
       >
         Cancel
       </button>

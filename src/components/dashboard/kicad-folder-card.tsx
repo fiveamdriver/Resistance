@@ -77,9 +77,9 @@ function defaultCheckedDocs(scan: FolderScan, selectedRelDir: string | null): st
 }
 
 const buttonPrimary =
-  "rounded-md bg-[#F5F0E8] px-3 py-1.5 text-sm font-semibold text-black transition-all hover:bg-[#F5F0E8]/90 disabled:opacity-40";
+  "rounded-md bg-[var(--accent-bg)] px-3 py-1.5 text-sm font-semibold text-[var(--accent-fg)] transition-all hover:bg-[var(--accent-bg-hover)] disabled:opacity-40";
 const buttonSecondary =
-  "rounded-md border border-[rgba(255,255,255,0.15)] px-3 py-1.5 text-sm text-[#F5F0E8] transition-colors hover:border-[rgba(255,255,255,0.3)] disabled:opacity-40";
+  "rounded-md border border-[rgba(var(--overlay-rgb),0.15)] px-3 py-1.5 text-sm text-[var(--fg)] transition-colors hover:border-[rgba(var(--overlay-rgb),0.3)] disabled:opacity-40";
 
 export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
   const router = useRouter();
@@ -278,25 +278,25 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
   }
 
   return (
-    <div className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+    <div className="rounded-lg border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(var(--overlay-rgb),0.03)] p-4">
       {folder.path ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-[#F5F0E8]">
+            <p className="text-sm font-medium text-[var(--fg)]">
               KiCad folder linked
               {kicadSync && (
-                <span className="ml-2 font-normal text-[#94a3b8]">
+                <span className="ml-2 font-normal text-[var(--fg-muted)]">
                   · synced {formatDate(kicadSync.syncedAt)}
                   {kicadSync.kicadVersion && ` · KiCad ${kicadSync.kicadVersion}`}
                 </span>
               )}
             </p>
-            <p className="mt-0.5 truncate font-mono text-xs text-[#4a5568]" title={folder.path}>
+            <p className="mt-0.5 truncate font-mono text-xs text-[var(--fg-subtle)]" title={folder.path}>
               {folder.path}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="mr-1 flex cursor-pointer items-center gap-2 text-xs text-[#94a3b8]">
+            <label className="mr-1 flex cursor-pointer items-center gap-2 text-xs text-[var(--fg-muted)]">
               <input
                 type="checkbox"
                 checked={folder.autoSyncEnabled}
@@ -351,7 +351,7 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
                 )
               }
               disabled={busy !== null}
-              className="text-xs text-[#4a5568] underline-offset-2 hover:text-[#94a3b8] hover:underline"
+              className="text-xs text-[var(--fg-subtle)] underline-offset-2 hover:text-[var(--fg-muted)] hover:underline"
             >
               Unlink
             </button>
@@ -360,10 +360,10 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-[#F5F0E8]">
+            <p className="text-sm font-medium text-[var(--fg)]">
               Link your KiCad project folder
             </p>
-            <p className="mt-0.5 text-xs text-[#94a3b8]">
+            <p className="mt-0.5 text-xs text-[var(--fg-muted)]">
               Import the netlist, BOM, and project documents straight from the
               folder — no manual exports.
             </p>
@@ -384,7 +384,7 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
                 value={pathInput}
                 onChange={(e) => setPathInput(e.target.value)}
                 placeholder="/absolute/path/to/kicad/project"
-                className="w-full flex-1 rounded-md border border-[rgba(255,255,255,0.1)] bg-black/30 px-3 py-1.5 font-mono text-xs text-[#F5F0E8] placeholder:text-[#4a5568] focus:border-[rgba(255,255,255,0.3)] focus:outline-none sm:w-80"
+                className="w-full flex-1 rounded-md border border-[rgba(var(--overlay-rgb),0.1)] bg-[var(--inset-bg)] px-3 py-1.5 font-mono text-xs text-[var(--fg)] placeholder:text-[var(--fg-subtle)] focus:border-[rgba(var(--overlay-rgb),0.3)] focus:outline-none sm:w-80"
               />
               <button
                 type="button"
@@ -407,7 +407,7 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
         </div>
       )}
 
-      {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+      {error && <p className="mt-2 text-xs text-red-700 dark:text-red-400">{error}</p>}
       {notice && <p className="mt-2 text-xs text-[#2dd4bf]">{notice}</p>}
 
       {scan && (
@@ -416,18 +416,18 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
           onClick={() => busy !== "import" && setScan(null)}
         >
           <div
-            className="max-h-[80vh] w-full max-w-xl overflow-y-auto rounded-lg border border-[rgba(255,255,255,0.12)] bg-[#0c0c0e] p-6"
+            className="max-h-[80vh] w-full max-w-xl overflow-y-auto rounded-lg border border-[rgba(var(--overlay-rgb),0.12)] bg-[#0c0c0e] p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-[#F5F0E8]">
+            <h3 className="text-lg font-semibold text-[var(--fg)]">
               Import from folder
             </h3>
-            <p className="mt-0.5 truncate font-mono text-xs text-[#4a5568]">
+            <p className="mt-0.5 truncate font-mono text-xs text-[var(--fg-subtle)]">
               {scan.folder}
             </p>
 
             {scan.edaProjects.length > 0 ? (
-              <div className="mt-4 rounded-md border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] p-3">
+              <div className="mt-4 rounded-md border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(var(--overlay-rgb),0.02)] p-3">
                 <label className="flex cursor-pointer items-start gap-3">
                   <input
                     type="checkbox"
@@ -435,7 +435,7 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
                     onChange={(e) => setIncludeExports(e.target.checked)}
                     className="mt-0.5 h-4 w-4 accent-[#2dd4bf]"
                   />
-                  <span className="text-sm font-medium text-[#F5F0E8]">
+                  <span className="text-sm font-medium text-[var(--fg)]">
                     Fresh {scan.edaProjects[0].displayName} exports
                     {scan.edaProjects.length === 1 &&
                       ` — ${scan.edaProjects[0].exports.map((x) => x.filename).join(", ")}`}
@@ -443,14 +443,14 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
                 </label>
                 {scan.edaProjects.length > 1 ? (
                   <div className="mt-2 space-y-1 pl-7">
-                    <p className="text-xs text-[#94a3b8]">
+                    <p className="text-xs text-[var(--fg-muted)]">
                       {scan.edaProjects.length} projects found — a Resistance
                       project tracks one board, pick which to sync:
                     </p>
                     {scan.edaProjects.map((p) => (
                       <label
                         key={p.relDir}
-                        className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-[rgba(255,255,255,0.03)]"
+                        className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-[rgba(var(--overlay-rgb),0.03)]"
                       >
                         <input
                           type="radio"
@@ -465,12 +465,12 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
                           disabled={!includeExports}
                           className="h-3.5 w-3.5 accent-[#2dd4bf]"
                         />
-                        <span className="text-sm text-[#F5F0E8]">{p.name}</span>
-                        <span className="min-w-0 flex-1 truncate font-mono text-xs text-[#4a5568]">
+                        <span className="text-sm text-[var(--fg)]">{p.name}</span>
+                        <span className="min-w-0 flex-1 truncate font-mono text-xs text-[var(--fg-subtle)]">
                           {p.relDir || "."}
                         </span>
                         {p.previouslySynced && (
-                          <span className="shrink-0 rounded-full border border-[rgba(255,255,255,0.12)] px-2 py-0.5 text-[10px] text-[#2dd4bf]">
+                          <span className="shrink-0 rounded-full border border-[rgba(var(--overlay-rgb),0.12)] px-2 py-0.5 text-[10px] text-[#2dd4bf]">
                             last synced
                           </span>
                         )}
@@ -478,7 +478,7 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-1 pl-7 text-xs text-[#94a3b8]">
+                  <p className="mt-1 pl-7 text-xs text-[var(--fg-muted)]">
                     Generated now from {scan.edaProjects[0].schematic}
                     {scan.edaProjects[0].generatorVersion &&
                       ` (KiCad ${scan.edaProjects[0].generatorVersion})`}{" "}
@@ -487,14 +487,14 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
                 )}
               </div>
             ) : scan.legacyProjects.length === 0 ? (
-              <p className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-400">
+              <p className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
                 No KiCad project recognized in this folder — only documents can
                 be imported.
               </p>
             ) : null}
 
             {scan.legacyProjects.length > 0 && (
-              <div className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-400">
+              <div className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
                 <p>
                   {scan.legacyProjects.length === 1
                     ? "This project was made with an old KiCad (version 5 or earlier), which can't be synced directly."
@@ -521,7 +521,7 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
                   {scan.legacyProjects.map((l) => (
                     <li key={l.relDir} className="flex items-center gap-2">
                       <span className="font-medium">{l.name}</span>
-                      <span className="min-w-0 flex-1 truncate font-mono text-amber-400/60">
+                      <span className="min-w-0 flex-1 truncate font-mono text-amber-700/70 dark:text-amber-700 dark:text-amber-400/60">
                         {l.proRelPath ?? l.relDir}
                       </span>
                       {desktop && l.proRelPath && (
@@ -542,7 +542,7 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
                                 }
                               })
                           }
-                          className="shrink-0 rounded border border-amber-500/40 px-2 py-0.5 text-amber-300 hover:bg-amber-500/20"
+                          className="shrink-0 rounded border border-amber-500/40 px-2 py-0.5 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
                         >
                           {converting?.relDir === l.relDir
                             ? "Waiting for save…"
@@ -557,28 +557,28 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
 
             {scan.documents.length > 0 && (
               <div className="mt-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-[#4a5568]">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--fg-subtle)]">
                   Documents in the folder
                 </p>
                 <ul className="mt-2 space-y-1">
                   {scan.documents.map((doc) => (
                     <li key={doc.relPath}>
-                      <label className="flex cursor-pointer items-center gap-3 rounded px-2 py-1.5 hover:bg-[rgba(255,255,255,0.03)]">
+                      <label className="flex cursor-pointer items-center gap-3 rounded px-2 py-1.5 hover:bg-[rgba(var(--overlay-rgb),0.03)]">
                         <input
                           type="checkbox"
                           checked={checkedDocs.has(doc.relPath)}
                           onChange={() => toggleDoc(doc.relPath)}
                           className="h-4 w-4 accent-[#2dd4bf]"
                         />
-                        <span className="min-w-0 flex-1 truncate text-sm text-[#F5F0E8]">
+                        <span className="min-w-0 flex-1 truncate text-sm text-[var(--fg)]">
                           {doc.relPath}
                         </span>
                         {doc.alreadyImported && (
-                          <span className="shrink-0 rounded-full border border-[rgba(255,255,255,0.12)] px-2 py-0.5 text-[10px] text-[#4a5568]">
+                          <span className="shrink-0 rounded-full border border-[rgba(var(--overlay-rgb),0.12)] px-2 py-0.5 text-[10px] text-[var(--fg-subtle)]">
                             already imported
                           </span>
                         )}
-                        <span className="shrink-0 text-xs text-[#4a5568]">
+                        <span className="shrink-0 text-xs text-[var(--fg-subtle)]">
                           {formatBytes(doc.sizeBytes)}
                         </span>
                       </label>
@@ -590,7 +590,7 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
 
             {scan.other.length > 0 && (
               <details className="mt-4">
-                <summary className="cursor-pointer text-xs text-[#4a5568] hover:text-[#94a3b8]">
+                <summary className="cursor-pointer text-xs text-[var(--fg-subtle)] hover:text-[var(--fg-muted)]">
                   Show all other files ({scan.other.length}
                   {scan.otherTruncated ? "+" : ""}) — not importable
                 </summary>
@@ -598,7 +598,7 @@ export function KicadFolderCard({ projectId, folder, kicadSync }: Props) {
                   {scan.other.map((f) => (
                     <li
                       key={f.relPath}
-                      className="truncate font-mono text-xs text-[#4a5568]"
+                      className="truncate font-mono text-xs text-[var(--fg-subtle)]"
                     >
                       {f.relPath} · {formatBytes(f.sizeBytes)}
                     </li>

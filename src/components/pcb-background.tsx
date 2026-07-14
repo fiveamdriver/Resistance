@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 
+import { useTheme } from "@/components/theme-provider";
+
 interface Pulse {
   pathIndex: number;
   progress: number;
@@ -111,14 +113,21 @@ const COMPONENTS: Component[] = [
 
 const PULSE_WIRE_INDICES = [0, 1, 2, 7, 14, 21, 30, 37, 44, 50, 55, 4, 18, 25];
 
+/** Canvas fillStyle/strokeStyle can't resolve CSS var() — needs a real value. */
+const overlayRgbFor = (theme: string) => (theme === "dark" ? "255,255,255" : "5,5,5");
+
 export default function PcbBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { theme } = useTheme();
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    const overlayRgb = overlayRgbFor(theme);
+    const ov = (alpha: number) => `rgba(${overlayRgb},${alpha})`;
 
     const resize = () => {
       canvas.width = window.innerWidth;
@@ -134,7 +143,7 @@ export default function PcbBackground() {
 
     const drawStatic = () => {
       ctx.save();
-      ctx.strokeStyle = "rgba(255,255,255,0.09)";
+      ctx.strokeStyle = ov(0.09);
       ctx.lineWidth = 1;
       for (const [x1, y1, x2, y2] of WIRES) {
         ctx.beginPath();
@@ -143,9 +152,9 @@ export default function PcbBackground() {
         ctx.stroke();
       }
       for (const comp of COMPONENTS) {
-        drawComponent(ctx, comp, cx, cy, SX(), SY());
+        drawComponent(ctx, comp, cx, cy, SX(), SY(), ov);
       }
-      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.fillStyle = ov(0.18);
       const junctions = [[100,180],[240,180],[380,100],[680,160],[700,340],[860,300],[1060,540]];
       for (const [jx, jy] of junctions) {
         ctx.beginPath();
@@ -198,7 +207,7 @@ export default function PcbBackground() {
       cancelAnimationFrame(animFrame);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [theme]);
 
   return (
     <canvas
@@ -208,10 +217,10 @@ export default function PcbBackground() {
   );
 }
 
-function drawComponent(ctx: CanvasRenderingContext2D, comp: Component, cx: (x: number) => number, cy: (y: number) => number, sx: number, sy: number) {
+function drawComponent(ctx: CanvasRenderingContext2D, comp: Component, cx: (x: number) => number, cy: (y: number) => number, sx: number, sy: number, ov: (alpha: number) => string) {
   ctx.save();
-  ctx.strokeStyle = "rgba(255,255,255,0.15)";
-  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.strokeStyle = ov(0.15);
+  ctx.fillStyle = ov(0.12);
   ctx.lineWidth = 1;
   const x = cx(comp.cx);
   const y = cy(comp.cy);
@@ -241,7 +250,7 @@ function drawComponent(ctx: CanvasRenderingContext2D, comp: Component, cx: (x: n
     }
     ctx.stroke();
     if (comp.label) {
-      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.fillStyle = ov(0.18);
       ctx.font = `${9 * Math.min(sx, sy)}px monospace`;
       ctx.fillText(comp.label, x + 6 * sx, y - 8 * sy);
     }
@@ -263,7 +272,7 @@ function drawComponent(ctx: CanvasRenderingContext2D, comp: Component, cx: (x: n
     }
     ctx.stroke();
     if (comp.label) {
-      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.fillStyle = ov(0.18);
       ctx.font = `${9 * Math.min(sx, sy)}px monospace`;
       ctx.fillText(comp.label, x + 8 * sx, y);
     }
@@ -280,7 +289,7 @@ function drawComponent(ctx: CanvasRenderingContext2D, comp: Component, cx: (x: n
     ctx.moveTo(x, y+10*sy); ctx.lineTo(x, y);
     ctx.moveTo(x-12*sx, y); ctx.lineTo(x+12*sx, y);
     ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.fillStyle = ov(0.18);
     ctx.font = `${9 * Math.min(sx, sy)}px monospace`;
     ctx.fillText("VCC", x - 10*sx, y - 4*sy);
   } else if (comp.type === "opamp") {
@@ -291,11 +300,11 @@ function drawComponent(ctx: CanvasRenderingContext2D, comp: Component, cx: (x: n
     ctx.lineTo(x - w/2, y + h/2);
     ctx.closePath();
     ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.fillStyle = ov(0.25);
     ctx.font = `${10 * Math.min(sx, sy)}px monospace`;
     ctx.fillText("+", x - w/2 + 4*sx, y + h/4 + 3*sy);
     ctx.fillText("−", x - w/2 + 4*sx, y - h/4 + 3*sy);
-    ctx.fillStyle = "rgba(255,255,255,0.15)";
+    ctx.fillStyle = ov(0.15);
     ctx.font = `${8 * Math.min(sx, sy)}px monospace`;
     ctx.fillText("U1", x - 6*sx, y - h/2 - 4*sy);
   } else if (comp.type === "transistor") {
@@ -306,7 +315,7 @@ function drawComponent(ctx: CanvasRenderingContext2D, comp: Component, cx: (x: n
     ctx.moveTo(x, y-s*0.5); ctx.lineTo(x+s, y-s);
     ctx.moveTo(x, y+s*0.5); ctx.lineTo(x+s, y+s);
     ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.15)";
+    ctx.fillStyle = ov(0.15);
     ctx.font = `${8 * Math.min(sx, sy)}px monospace`;
     ctx.fillText("Q1", x + s + 2*sx, y);
   } else if (comp.type === "and") {

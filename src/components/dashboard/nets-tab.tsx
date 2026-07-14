@@ -13,21 +13,21 @@ export function NetsTab({ nets }: { nets: NetVM[] }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)]">
+    <div className="overflow-x-auto rounded-lg border border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(var(--overlay-rgb),0.03)]">
       <table className="w-full text-left text-sm">
-        <thead className="border-b border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-xs uppercase tracking-wide text-[#4a5568]">
+        <thead className="border-b border-[rgba(var(--overlay-rgb),0.08)] bg-[rgba(var(--overlay-rgb),0.03)] text-xs uppercase tracking-wide text-[var(--fg-subtle)]">
           <tr>
             <th className="px-4 py-2.5 font-medium">Net</th>
             <th className="px-4 py-2.5 font-medium">Connections</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[rgba(255,255,255,0.06)]">
+        <tbody className="divide-y divide-[rgba(var(--overlay-rgb),0.06)]">
           {nets.map((net) => (
-            <tr key={net.id} className="transition hover:bg-[rgba(255,255,255,0.03)]">
-              <td className="px-4 py-2.5 font-mono font-medium text-[#F5F0E8]">
+            <tr key={net.id} className="transition hover:bg-[rgba(var(--overlay-rgb),0.03)]">
+              <td className="px-4 py-2.5 font-mono font-medium text-[var(--fg)]">
                 {net.name}
               </td>
-              <td className="px-4 py-2.5 text-[#94a3b8]">
+              <td className="px-4 py-2.5 text-[var(--fg-muted)]">
                 {net.connectionCount}
               </td>
             </tr>

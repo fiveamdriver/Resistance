@@ -14,15 +14,15 @@ export default function HomePage() {
 
             {/* Left: copy ─────────────────────────────────────────────────── */}
             <div className="relative z-10 pt-10">
-              <span className="inline-block rounded border border-[rgba(255,255,255,0.09)] px-2.5 py-1 font-mono text-xs text-[#374151]">
+              <span className="inline-block rounded border border-[rgba(var(--overlay-rgb),0.09)] px-2.5 py-1 font-mono text-xs text-[#374151]">
                 Altium export intelligence · Beta
               </span>
 
-              <h1 className="mt-4 text-4xl font-bold leading-tight tracking-tight text-[#F5F0E8] lg:text-5xl xl:text-6xl">
+              <h1 className="mt-4 text-4xl font-bold leading-tight tracking-tight text-[var(--fg)] lg:text-5xl xl:text-6xl">
                 Know your design.<br />Navigate it.
               </h1>
 
-              <p className="mt-7 max-w-xs text-base leading-relaxed text-[#F5F0E8]/60">
+              <p className="mt-7 max-w-xs text-base leading-relaxed text-[var(--fg)]/60">
                 Drop in your Altium exports. Instantly search, trace, and
                 interrogate your PCB — by refdes, net name, or pin.
                 Built for designs with hundreds of nets and dozens of sheets,
@@ -33,13 +33,13 @@ export default function HomePage() {
               <div className="mt-10 flex flex-wrap gap-3">
                 <Link
                   href="/projects"
-                  className="rounded-md bg-[#F5F0E8] px-6 py-2.5 text-sm font-semibold text-black transition-all hover:bg-[#F5F0E8]/90"
+                  className="rounded-md bg-[var(--accent-bg)] px-6 py-2.5 text-sm font-semibold text-[var(--accent-fg)] transition-all hover:bg-[var(--accent-bg-hover)]"
                 >
                   Open projects
                 </Link>
                 <Link
                   href="/projects/new"
-                  className="rounded-md border border-[#F5F0E8]/20 px-6 py-2.5 text-sm font-semibold bg-[#F5F0E8] text-black transition-all hover:border-[#F5F0E8]/40 hover:bg-[#F5F0E8]/5"
+                  className="rounded-md border border-[rgba(var(--accent-bg-rgb),0.2)] px-6 py-2.5 text-sm font-semibold bg-[var(--accent-bg)] text-[var(--accent-fg)] transition-all hover:border-[rgba(var(--accent-bg-rgb),0.4)] hover:bg-[rgba(var(--accent-bg-rgb),0.05)]"
                 >
                   New project
                 </Link>
